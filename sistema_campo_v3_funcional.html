@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Recolección v3.1 - Paz y Esperanza</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 30px;
+            overflow: hidden;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            color: #667eea;
+            font-size: 1.8em;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #eee;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            color: #999;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        select, input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.95em;
+            font-family: inherit;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .codigo {
+            background: #667eea;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 0.95em;
+            margin-bottom: 20px;
+            word-break: break-all;
+        }
+
+        .recorder {
+            background: #f0f0f0;
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .btn-grabar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: none;
+            background: #e74c3c;
+            color: white;
+            font-size: 2em;
+            cursor: pointer;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+        }
+
+        .btn-grabar:hover {
+            transform: scale(1.05);
+        }
+
+        .btn-grabar.grabando {
+            background: #27ae60;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 4px 15px rgba(39, 174, 96, 0.4); }
+            50% { box-shadow: 0 4px 25px rgba(39, 174, 96, 0.8); }
+        }
+
+        .time-display {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-top: 10px;
+            color: #333;
+        }
+
+        .audio-play {
+            display: none;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        audio {
+            width: 100%;
+            max-width: 300px;
+            margin-bottom: 10px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.95em;
+            transition: all 0.3s;
+            margin-bottom: 10px;
+        }
+
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #229954;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border-left: 4px solid;
+            font-size: 0.9em;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border-color: #28a745;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border-color: #f5c6cb;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border-color: #bee5eb;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .resultado {
+            background: #d4edda;
+            border: 2px solid #28a745;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .resultado.show {
+            display: block;
+        }
+
+        .resultado h3 {
+            color: #155724;
+            margin-bottom: 10px;
+        }
+
+        .resultado p {
+            color: #155724;
+            font-size: 0.9em;
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 15px;
+            }
+
+            header h1 {
+                font-size: 1.4em;
+            }
+
+            .row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎯 Recolección en Campo v3.1</h1>
+            <p>Paz y Esperanza | Sistema Professional</p>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('individual')">👤 Individual</button>
+            <button class="tab-btn" onclick="switchTab('grupal')">👥 Grupal</button>
+        </div>
+
+        <!-- TAB INDIVIDUAL -->
+        <div id="individual" class="tab-content active">
+            <div id="alertIndividual"></div>
+
+            <div class="form-group">
+                <label>Provincia</label>
+                <select id="provinciaInd" onchange="actualizarCodigoInd()">
+                    <option value="">Seleccionar</option>
+                    <option value="MB">Manabí (MB)</option>
+                    <option value="G">Guayas (G)</option>
+                    <option value="M">Milagro (M)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Lugar</label>
+                <select id="lugarInd" onchange="actualizarCodigoInd()">
+                    <option value="">Seleccionar</option>
+                    <option value="MT">Manta (MT)</option>
+                    <option value="PT">Portoviejo (PT)</option>
+                    <option value="J">Jaramijo (J)</option>
+                </select>
+            </div>
+
+            <div class="row">
+                <div class="form-group">
+                    <label># Paciente</label>
+                    <input type="number" id="noPacInd" min="1" placeholder="1" onchange="actualizarCodigoInd()">
+                </div>
+                <div class="form-group">
+                    <label>Género</label>
+                    <select id="generoInd" onchange="actualizarCodigoInd()">
+                        <option value="">Seleccionar</option>
+                        <option value="M">Masculino</option>
+                        <option value="F">Femenino</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="codigo" id="codigoInd">Código se generará automáticamente</div>
+
+            <label>🎤 Grabar Audio</label>
+            <div class="recorder">
+                <button class="btn-grabar" id="btnGrabarInd" onclick="iniciarGrabacionInd()">🎤</button>
+                <div class="time-display" id="tiempoInd">00:00</div>
+            </div>
+
+            <div class="audio-play" id="audioPlayInd">
+                <audio id="audioInd" controls></audio>
+                <button class="btn btn-danger" onclick="descartarAudioInd()">🗑️ Descartar</button>
+            </div>
+
+            <button class="btn btn-success" id="btnEnviarInd" onclick="enviarAudioInd()" disabled>📤 Enviar a Gemini</button>
+
+            <div class="loading" id="loadingInd">
+                <div class="spinner"></div>
+                <p style="margin-top: 10px;">Procesando...</p>
+            </div>
+
+            <div class="resultado" id="resultadoInd"></div>
+        </div>
+
+        <!-- TAB GRUPAL -->
+        <div id="grupal" class="tab-content">
+            <p style="text-align: center; color: #999; margin: 30px 0;">
+                La versión grupal está en desarrollo. Por ahora usa Individual.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // CONFIGURACIÓN
+        const PROYECTO = "K-COL-2025-9005";
+        const INDICADOR = "R1A6";
+        const AÑO = "2025";
+        const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwaylakUHj1C4jor8DW7x6weKcZO86Se7Y8eSQbx_kCLCHfQCBtcugejcHW3WO6cy68/exec';
+
+        // VARIABLES GLOBALES
+        let mediaRecorder;
+        let audioChunks = [];
+        let recordingStartTime;
+        let recordingTimer;
+
+        // GRABADOR INDIVIDUAL
+        async function iniciarGrabacionInd() {
+            if (!mediaRecorder) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    recordingStartTime = Date.now();
+
+                    document.getElementById('btnGrabarInd').textContent = '⏹️';
+                    document.getElementById('btnGrabarInd').onclick = () => detenerGrabacionInd();
+
+                    iniciarTimer('tiempoInd');
+
+                    mediaRecorder.ondataavailable = (event) => {
+                        audioChunks.push(event.data);
+                    };
+
+                    mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        const audioUrl = URL.createObjectURL(audioBlob);
+                        document.getElementById('audioInd').src = audioUrl;
+                        document.getElementById('audioPlayInd').style.display = 'block';
+                        document.getElementById('btnEnviarInd').disabled = false;
+
+                        // Guardar blob para enviar
+                        window.audioIndividualBlob = audioBlob;
+                    };
+
+                    mediaRecorder.start();
+                } catch (error) {
+                    mostrarAlerta('Error: ' + error.message, 'error', 'alertIndividual');
+                }
+            }
+        }
+
+        function detenerGrabacionInd() {
+            if (mediaRecorder) {
+                mediaRecorder.stop();
+                document.getElementById('btnGrabarInd').textContent = '🎤';
+                document.getElementById('btnGrabarInd').onclick = () => iniciarGrabacionInd();
+                clearInterval(recordingTimer);
+            }
+        }
+
+        function iniciarTimer(elementId) {
+            recordingTimer = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+                const minutos = Math.floor(elapsed / 60);
+                const segundos = elapsed % 60;
+                document.getElementById(elementId).textContent = 
+                    `${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`;
+
+                if (elapsed >= 600) { // 10 minutos
+                    detenerGrabacionInd();
+                }
+            }, 1000);
+        }
+
+        // CÓDIGOS
+        function generarCodigoInd() {
+            const provincia = document.getElementById('provinciaInd').value;
+            const lugar = document.getElementById('lugarInd').value;
+            const noPac = String(document.getElementById('noPacInd').value || 0).padStart(3, '0');
+            const genero = document.getElementById('generoInd').value;
+
+            if (provincia && lugar && noPac !== '000' && genero) {
+                return `${PROYECTO}_${INDICADOR}_${provincia}-${lugar}-TI-${noPac}-${AÑO}`;
+            }
+            return null;
+        }
+
+        function actualizarCodigoInd() {
+            const codigo = generarCodigoInd();
+            const display = document.getElementById('codigoInd');
+            if (codigo) {
+                display.textContent = `Código: ${codigo}`;
+                display.style.background = '#27ae60';
+            } else {
+                display.textContent = 'Código se generará automáticamente';
+                display.style.background = '#667eea';
+            }
+        }
+
+        // ENVIAR AUDIO
+        async function enviarAudioInd() {
+            const codigo = generarCodigoInd();
+            const audioBlob = window.audioIndividualBlob;
+
+            if (!codigo || !audioBlob) {
+                mostrarAlerta('Completa los datos y graba audio', 'error', 'alertIndividual');
+                return;
+            }
+
+            document.getElementById('loadingInd').style.display = 'block';
+            document.getElementById('resultadoInd').classList.remove('show');
+
+            try {
+                // Convertir blob a base64
+                const audioBase64 = await blobToBase64(audioBlob);
+
+                // Crear FormData
+                const formData = new FormData();
+                formData.append('tipo', 'individual');
+                formData.append('codigo', codigo);
+                formData.append('audio', audioBase64);
+                formData.append('tipoSesion', 'primera');
+
+                // Enviar a Google Apps Script
+                const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const resultado = await response.json();
+
+                document.getElementById('loadingInd').style.display = 'none';
+
+                if (resultado.exito) {
+                    mostrarResultado(`✅ ÉXITO!\n\nCódigo: ${codigo}\n\nSistema procesa automáticamente:\n- Gemini analiza audio\n- Genera informe Word\n- Agenda cita Google Calendar\n- Prepara datos Kobo`, 'alertIndividual');
+                    mostrarResultadoDiv(resultado, 'resultadoInd');
+                } else {
+                    mostrarAlerta('Error: ' + (resultado.error || 'Unknown'), 'error', 'alertIndividual');
+                }
+            } catch (error) {
+                document.getElementById('loadingInd').style.display = 'none';
+                mostrarAlerta('Error de conexión: ' + error.message, 'error', 'alertIndividual');
+            }
+        }
+
+        function blobToBase64(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        }
+
+        function mostrarAlerta(mensaje, tipo, containerId) {
+            const container = document.getElementById(containerId);
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${tipo}`;
+            alert.textContent = mensaje;
+            container.innerHTML = '';
+            container.appendChild(alert);
+            setTimeout(() => alert.remove(), 6000);
+        }
+
+        function mostrarResultado(mensaje, alertId) {
+            mostrarAlerta(mensaje, 'success', alertId);
+        }
+
+        function mostrarResultadoDiv(resultado, divId) {
+            const div = document.getElementById(divId);
+            div.innerHTML = `
+                <h3>✅ Procesado Exitosamente</h3>
+                <p><strong>Código:</strong> ${resultado.codigo}</p>
+                <p><strong>Ficha Word:</strong> Generada</p>
+                <p><strong>Google Calendar:</strong> Cita agendada</p>
+                <p><strong>Trazabilidad:</strong> Guardada</p>
+            `;
+            div.classList.add('show');
+        }
+
+        function descartarAudioInd() {
+            document.getElementById('audioInd').src = '';
+            document.getElementById('audioPlayInd').style.display = 'none';
+            document.getElementById('btnEnviarInd').disabled = true;
+            audioChunks = [];
+            window.audioIndividualBlob = null;
+        }
+
+        // NAVEGACIÓN
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+    </script>
+</body>
+</html>
