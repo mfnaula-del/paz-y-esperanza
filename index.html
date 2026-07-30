@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1B2027">
+<title>Atención Psicológica · Paz y Esperanza</title>
+<style>
+:root{
+  --tinta:#1B2027; --papel:#E9EBE6; --carta:#FFFFFF; --oliva:#3F4A3C;
+  --senal:#C4442E; --ambar:#7A5410; --apagado:#7A8579; --linea:#CFD4CB;
+  --mono:ui-monospace,"SF Mono","Roboto Mono","DejaVu Sans Mono",monospace;
+  --sans:ui-sans-serif,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:var(--sans);background:var(--papel);color:var(--tinta);min-height:100dvh;
+     padding:26px 16px calc(30px + env(safe-area-inset-bottom))}
+.envoltura{max-width:520px;margin:0 auto}
+
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--oliva)}
+h1{font-size:26px;font-weight:600;letter-spacing:-.025em;line-height:1.1;margin-top:5px}
+.hoy{font-size:13px;color:var(--apagado);margin-top:6px}
+
+/* --- lo próximo --- */
+.proxima{margin-top:22px;background:var(--tinta);color:var(--papel);border-radius:14px;padding:17px 18px}
+.proxima .rot{font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+  color:#8FA08C;margin-bottom:7px}
+.proxima .nom{font-size:19px;font-weight:600;letter-spacing:-.015em}
+.proxima .det{font-family:var(--mono);font-size:12.5px;color:#B6C0B4;margin-top:5px}
+.proxima .extra{font-size:12px;color:#9AA6B2;margin-top:8px;line-height:1.45}
+.proxima.vacia{background:var(--carta);color:var(--apagado);border:1px dashed var(--linea)}
+.proxima.vacia .rot{color:var(--oliva)}
+.proxima.vacia .nom{font-size:14.5px;font-weight:400;line-height:1.5}
+.proxima.alerta{border-left:4px solid var(--ambar)}
+
+/* --- herramientas --- */
+.loc{margin:16px 0 0;background:var(--carta);border:1px solid var(--linea);
+  border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px}
+.loc label{margin:0;white-space:nowrap;font-size:10px}
+.loc select{font-size:14px;padding:7px 8px;border:0;background:transparent;font-weight:600;
+  color:var(--oliva);width:auto;flex:1}
+.rotulo{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--oliva);margin:26px 0 11px}
+.tarjetas{display:flex;flex-direction:column;gap:11px}
+.tarjeta{display:block;text-decoration:none;color:inherit;background:var(--carta);
+  border:1px solid var(--linea);border-radius:13px;padding:17px 18px;position:relative}
+.tarjeta:hover{border-color:var(--oliva)}
+.tarjeta:focus-visible{outline:2px solid var(--oliva);outline-offset:2px}
+.tarjeta .num{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--oliva);
+  letter-spacing:.05em}
+.tarjeta .tit{font-size:17.5px;font-weight:600;letter-spacing:-.015em;margin-top:3px}
+.tarjeta .txt{font-size:13px;color:var(--apagado);line-height:1.5;margin-top:6px}
+.tarjeta .flecha{position:absolute;right:17px;top:50%;transform:translateY(-50%);
+  font-size:19px;color:var(--linea)}
+.tarjeta:hover .flecha{color:var(--oliva)}
+.globo{display:inline-block;background:var(--oliva);color:#fff;font-family:var(--mono);
+  font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:7px;
+  vertical-align:2px}
+
+.estado{margin-top:22px;font-size:11.5px;color:var(--apagado);text-align:center;line-height:1.6}
+.punto{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--linea);
+  margin-right:5px;vertical-align:1px}
+.punto.ok{background:#4A7A42} .punto.mal{background:var(--senal)}
+.pie{margin-top:18px;font-size:11px;color:var(--apagado);line-height:1.6;text-align:center}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="envoltura">
+
+  <p class="eyebrow">Paz y Esperanza · Diakonie</p>
+  <h1>Atención psicológica</h1>
+  <p class="hoy" id="hoy"></p>
+
+  <div class="proxima vacia" id="proxima">
+    <p class="rot">Lo próximo</p>
+    <p class="nom">Consultando la agenda…</p>
+  </div>
+
+  <div class="loc" id="cajaLoc">
+    <label for="localidad">Localidad</label>
+    <select id="localidad" onchange="cambiarLocalidad()">
+      <option value="MB">Manabí — Milton Naula</option>
+      <option value="G">Guayaquil — Paola Vallejo</option>
+      <option value="M">Milagro — Mariana Solís</option>
+    </select>
+  </div>
+
+  <p class="rotulo">Herramientas</p>
+  <div class="tarjetas">
+
+    <a class="tarjeta" href="agenda_v5.html">
+      <span class="num">01</span>
+      <div class="tit">Agenda<span class="globo" id="globoCitas" hidden></span></div>
+      <p class="txt">Citar a alguien nuevo, sin código. Avisa si el horario ya está
+        ocupado y propone los huecos libres.</p>
+      <span class="flecha">→</span>
+    </a>
+
+    <a class="tarjeta" href="app_campo_v5.html">
+      <span class="num">02</span>
+      <div class="tit">Sesiones</div>
+      <p class="txt">Dictas la sesión y se genera la Ficha Integrada o el Informe de
+        Terapias Grupales. Aquí nace el código del paciente.</p>
+      <span class="flecha">→</span>
+    </a>
+
+    <a class="tarjeta" href="warwick_v5.html">
+      <span class="num">03</span>
+      <div class="tit">Escala de bienestar</div>
+      <p class="txt">Warwick pre y post, desde los 17 años y solo en individual.
+        Ficha imprimible y panel de mejora.</p>
+      <span class="flecha">→</span>
+    </a>
+
+  </div>
+
+  <p class="estado" id="estado"><span class="punto"></span>Comprobando el servidor…</p>
+
+  <p class="pie">Documento confidencial · Estándares Esfera e IASC<br>
+    Milton Fernando Naula Chimbo</p>
+</div>
+
+<script>
+// ===========================================================================
+//  Pega aquí la MISMA URL /exec del Apps Script
+// ===========================================================================
+const URL_BACKEND = 'https://script.google.com/macros/s/AKfycbznImdt0wZkkJHl_xu5bWxjdhZAOS3Gyqbw1L086yO4MkGIDizfUBq4SfhdeJm0X1Lh/exec';
+
+
+// ---------------------------------------------------------- localidad
+// Se recuerda en el propio enlace, así cada persona guarda su acceso ya fijado.
+function localidadActual(){
+  const u=new URLSearchParams(location.search).get('loc');
+  return (u && ['MB','G','M'].indexOf(u)!==-1) ? u : 'MB';
+}
+function cambiarLocalidad(){
+  const v=document.getElementById('localidad').value;
+  const u=new URL(location.href);
+  u.searchParams.set('loc',v);
+  location.replace(u.toString());
+}
+const LOC=localidadActual();
+
+
+const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// --- fecha de hoy en palabras ---
+const DIAS=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto',
+             'septiembre','octubre','noviembre','diciembre'];
+const n=new Date();
+document.getElementById('hoy').textContent =
+  DIAS[n.getDay()]+' '+n.getDate()+' de '+MESES[n.getMonth()]+' de '+n.getFullYear();
+
+document.getElementById('localidad').value=LOC;
+// los enlaces conservan la localidad elegida
+document.querySelectorAll('.tarjeta').forEach(a=>{
+  a.href=a.getAttribute('href')+'?loc='+LOC;
+});
+
+async function pedir(datos){
+  const r=await fetch(URL_BACKEND,{method:'POST',body:new URLSearchParams(datos)});
+  const d=await r.json();
+  if(!d.exito) throw new Error(d.error||'error');
+  return d;
+}
+
+// --- estado del servidor ---
+async function comprobar(){
+  const el=document.getElementById('estado');
+  if(URL_BACKEND.indexOf('PEGA_AQUI')===0){
+    el.innerHTML='<span class="punto mal"></span>Falta poner la dirección del servidor '
+      +'en este archivo.';
+    return false;
+  }
+  try{
+    const r=await fetch(URL_BACKEND);
+    const d=await r.json();
+    el.innerHTML='<span class="punto ok"></span>Servidor conectado · '+esc(d.version||'');
+    return true;
+  }catch(e){
+    el.innerHTML='<span class="punto mal"></span>Sin conexión con el servidor. '
+      +'Revisa la implementación en Apps Script.';
+    return false;
+  }
+}
+
+// --- próxima cita pendiente ---
+async function proxima(){
+  const caja=document.getElementById('proxima');
+  try{
+    const d=await pedir({accion:'agendaListar',filtro:'',dias:'60',localidad:LOC});
+    const pend=d.citas.filter(c=>c.estado==='Agendada');
+
+    const globo=document.getElementById('globoCitas');
+    if(pend.length){ globo.textContent=pend.length; globo.hidden=false; }
+
+    const vencidas=pend.filter(c=>c.vencida);
+    const futuras=pend.filter(c=>!c.vencida);
+
+    if(vencidas.length){
+      caja.className='proxima alerta';
+      caja.innerHTML='<p class="rot">Sin marcar</p>'
+        +'<p class="nom">'+esc(vencidas[0].nombre)+'</p>'
+        +'<p class="det">'+esc(vencidas[0].cuando)+'</p>'
+        +'<p class="extra">'+(vencidas.length>1
+            ? 'Esta y '+(vencidas.length-1)+' cita(s) más ya pasaron sin marcar si asistieron.'
+            : 'Esta cita ya pasó y no marcaste si asistió.')
+        +' Entra a Agenda para cerrarlas.</p>';
+      return;
+    }
+
+    if(!futuras.length){
+      caja.className='proxima vacia';
+      caja.innerHTML='<p class="rot">Lo próximo</p>'
+        +'<p class="nom">No tienes citas pendientes. Entra a Agenda para citar a alguien.</p>';
+      return;
+    }
+
+    const c=futuras[0];
+    caja.className='proxima';
+    caja.innerHTML='<p class="rot">Lo próximo</p>'
+      +'<p class="nom">'+esc(c.nombre)+'</p>'
+      +'<p class="det">'+esc(c.cuando)+'–'+esc(c.hasta)
+      +(c.lugar?' · '+esc(c.lugar):'')+'</p>'
+      +'<p class="extra">'+esc(c.modalidad)
+      +(c.nueva?' · persona nueva, el código nace en esta sesión':' · '+esc(c.codigo))
+      +(futuras.length>1?'<br>'+(futuras.length-1)+' cita(s) más adelante.':'')+'</p>';
+
+  }catch(e){
+    caja.className='proxima vacia';
+    caja.innerHTML='<p class="rot">Lo próximo</p>'
+      +'<p class="nom">No pude leer la agenda. Las herramientas de abajo funcionan igual.</p>';
+  }
+}
+
+(async function(){ if(await comprobar()) proxima(); else proxima(); })();
+</script>
+</body>
+</html>

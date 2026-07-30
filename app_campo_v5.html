@@ -34,6 +34,11 @@ h1{font-size:22px;font-weight:600;letter-spacing:-.02em;margin-top:4px}
 .modo button[aria-selected="true"]{background:var(--carta);color:var(--tinta);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .explica{font-size:12.5px;line-height:1.5;color:var(--apagado);margin-top:10px;padding-left:2px}
 
+.loc{margin:16px 0 0;background:var(--carta);border:1px solid var(--linea);
+  border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px}
+.loc label{margin:0;white-space:nowrap;font-size:10px}
+.loc select{font-size:14px;padding:7px 8px;border:0;background:transparent;font-weight:600;
+  color:var(--oliva);width:auto;flex:1}
 .paso{margin-top:24px}
 .paso-cabeza{display:flex;align-items:baseline;gap:9px;margin-bottom:11px}
 .paso-num{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--oliva);transition:color .35s}
@@ -98,9 +103,19 @@ audio{width:100%;margin-top:12px}
 <body>
 <div class="envoltura">
 
+  <p style="margin-bottom:14px"><a href="index.html" style="color:#7A8579;text-decoration:none;font-size:12.5px">&larr; Inicio</a></p>
   <p class="eyebrow">Paz y Esperanza · Ecuador</p>
   <h1>Fichas de atención</h1>
   <p class="sub">Dicta la sesión. El sistema redacta el documento.</p>
+
+<div class="loc" id="cajaLoc">
+    <label for="localidad">Localidad</label>
+    <select id="localidad" onchange="cambiarLocalidad()">
+      <option value="MB">Manabí — Milton Naula</option>
+      <option value="G">Guayaquil — Paola Vallejo</option>
+      <option value="M">Milagro — Mariana Solís</option>
+    </select>
+  </div>
 
   <div class="modo" role="tablist">
     <button role="tab" aria-selected="true"  onclick="ponerModo('TI',this)">Individual</button>
@@ -112,21 +127,9 @@ audio{width:100%;margin-top:12px}
     <div class="paso-cabeza"><span class="paso-num">01</span><span class="paso-titulo">Identificar</span></div>
     <div class="carta">
       <div class="rejilla">
-        <div class="campo">
-          <label for="prov">Provincia</label>
-          <select id="prov" onchange="pintarCodigo()">
-            <option value="">—</option><option value="MB">Manabí</option>
-            <option value="G">Guayas</option><option value="M">Milagro</option>
-          </select>
-        </div>
-        <div class="campo">
+        <div class="campo ancho">
           <label for="lugar">Lugar</label>
-          <select id="lugar" onchange="pintarCodigo()">
-            <option value="">—</option><option value="MT">Manta</option>
-            <option value="PT">Portoviejo</option><option value="J">Jaramijó</option>
-            <option value="MC">Montecristi</option><option value="G">Guayaquil</option>
-            <option value="M">Milagro</option>
-          </select>
+          <select id="lugar" onchange="pintarCodigo()"></select>
         </div>
         <div class="campo">
           <label for="num" id="lblNum">N° de paciente</label>
@@ -189,6 +192,13 @@ const URL_BACKEND = 'https://script.google.com/macros/s/AKfycbznImdt0wZkkJHl_xu5
 const PROYECTO='K-COL-2025-9005', INDICADOR='R1A6', ANIO='2025';
 const MAX_SEG=360, HZ=16000;
 
+// Cantones de cada localidad: el desplegable solo muestra los que corresponden.
+const CANTONES={
+  MB:[['MT','Manta'],['PT','Portoviejo'],['J','Jaramijó'],['MC','Montecristi']],
+  G :[['G','Guayaquil']],
+  M :[['M','Milagro']]
+};
+
 const TEXTOS={
   TI:'Genera la Ficha Integrada de Atención de Salud Mental. Si la persona tiene 17 años '
     +'o más, después queda habilitada para la escala Warwick.',
@@ -198,6 +208,21 @@ const TEXTOS={
 };
 
 let modo='TI', fotoB64='', wavBlob=null;
+// ---------------------------------------------------------- localidad
+// Se recuerda en el propio enlace, así cada persona guarda su acceso ya fijado.
+function localidadActual(){
+  const u=new URLSearchParams(location.search).get('loc');
+  return (u && ['MB','G','M'].indexOf(u)!==-1) ? u : 'MB';
+}
+function cambiarLocalidad(){
+  const v=document.getElementById('localidad').value;
+  const u=new URL(location.href);
+  u.searchParams.set('loc',v);
+  location.replace(u.toString());
+}
+const LOC=localidadActual();
+document.getElementById('localidad').value=LOC;
+
 let ctx,fuente,proc,pista,trozos=[],hzOrigen=48000,grabando=false,t0,cronometro;
 const val=id=>document.getElementById(id).value.trim();
 const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -213,7 +238,7 @@ function ponerModo(m,btn){
 }
 
 function armarCodigo(){
-  const p=val('prov'),l=val('lugar'),n=val('num');
+  const p=LOC, l=val('lugar'), n=val('num');
   if(!p||!l||!n) return null;
   return PROYECTO+'_'+INDICADOR+'_'+p+'-'+l+'-'+modo+'-'+String(n).padStart(3,'0')+'-'+ANIO;
 }
@@ -392,14 +417,17 @@ function aBase64(blob){
 }
 
 function mostrar(d){
-  const fila=(k,v)=> (v||v===0) ? '<dt>'+k+'</dt><dd>'+esc(v)+'</dd>' : '';
+  // crudo=true para valores que ya llevan HTML propio (el código va en monoespaciada)
+  const fila=(k,v,crudo)=> (v||v===0)
+    ? '<dt>'+k+'</dt><dd>'+(crudo?v:esc(v))+'</dd>' : '';
   const revisar=(d.revisar&&d.revisar.length)
     ? '<div class="aviso error" style="margin-top:10px"><b>Revisar a mano</b>'+esc(d.revisar.join(', '))+'</div>':'';
   const nota=d.nota?'<div class="aviso neutro" style="margin-top:10px">'+esc(d.nota)+'</div>':'';
   document.getElementById('salida').innerHTML=
     '<div class="aviso ok resultado"><b>'
     + (d.tipo==='TG'?'Informe grupal generado':'Ficha Integrada generada')+'</b><dl>'
-    + fila('Código','<span style="font-family:var(--mono);font-size:11px">'+d.codigo+'</span>')
+    + fila('Código','<span style="font-family:var(--mono);font-size:11px">'
+        +esc(d.codigo)+'</span>', true)
     + fila('Sesión',d.sesion)
     + fila(d.tipo==='TG'?'Grupo':'Paciente', d.tipo==='TG'?d.grupo:d.nombre)
     + fila('Participantes',d.participantes)
@@ -409,7 +437,7 @@ function mostrar(d){
     + fila('Warwick',d.warwick)
     + fila('Próxima cita',d.cita)
     + fila('Trazabilidad',d.trazabilidad)
-    + '</dl><p style="margin-top:10px"><a href="'+d.documento+'" target="_blank" rel="noopener">'
+    + '</dl><p style="margin-top:10px"><a href="'+esc(d.documento)+'" target="_blank" rel="noopener">'
     + 'Abrir documento</a></p></div>' + nota + revisar;
 }
 
@@ -429,6 +457,16 @@ function decir(clase,titulo,texto){
   document.getElementById('salida').innerHTML=
     '<div class="aviso '+clase+'"><b>'+titulo+'</b>'+texto+'</div>';
 }
+
+// llenar el desplegable de lugar según la localidad
+(function(){
+  const sel=document.getElementById('lugar');
+  const lista=CANTONES[LOC]||CANTONES.MB;
+  sel.innerHTML=(lista.length>1?'<option value="">—</option>':'')
+    + lista.map(([v,t])=>'<option value="'+v+'">'+t+'</option>').join('');
+  if(lista.length===1) sel.value=lista[0][0];
+  pintarCodigo();
+})();
 
 document.getElementById('sesion').addEventListener('input',revisarEnvio);
 document.getElementById('explica').textContent=TEXTOS.TI;

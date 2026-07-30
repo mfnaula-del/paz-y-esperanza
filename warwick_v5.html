@@ -30,6 +30,11 @@ h1{font-size:22px;font-weight:600;letter-spacing:-.02em;margin-top:4px}
 .modo button[aria-selected="true"]{background:var(--carta);color:var(--tinta);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .vista{display:none} .vista.on{display:block}
 
+.loc{margin:16px 0 0;background:var(--carta);border:1px solid var(--linea);
+  border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px}
+.loc label{margin:0;white-space:nowrap;font-size:10px}
+.loc select{font-size:14px;padding:7px 8px;border:0;background:transparent;font-weight:600;
+  color:var(--oliva);width:auto;flex:1}
 .paso{margin-top:22px}
 .paso-cabeza{display:flex;align-items:baseline;gap:9px;margin-bottom:11px}
 .paso-num{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--oliva)}
@@ -132,6 +137,9 @@ table.of td.c{text-align:center;width:11%}
 .cifra{border:1px solid #9aa5b1;padding:9px;text-align:center}
 .cifra b{display:block;font-family:var(--mono);font-size:21px;font-weight:400;color:var(--azul)}
 .cifra span{font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:#555}
+.nota-metodo{margin-top:16px;padding:9px 11px;border-left:2px solid #9aa5b1;background:#F6F7F9;
+  font-size:9.5px;line-height:1.5;color:#555;border-radius:0 4px 4px 0}
+.nota-metodo b{color:var(--azul)}
 .opcion{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--apagado);margin-top:12px}
 .opcion input{width:auto}
 .pill{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700}
@@ -163,12 +171,22 @@ table.of td.c{text-align:center;width:11%}
 <div class="envoltura">
 
   <div class="no-imprimir">
+  <p class="no-imprimir" style="margin-bottom:14px"><a href="index.html" style="color:#7A8579;text-decoration:none;font-size:12.5px">&larr; Inicio</a></p>
     <p class="eyebrow">Paz y Esperanza · Ecuador</p>
     <h1>Escala Warwick</h1>
     <p class="sub">Busca a la persona por su nombre. Lo demás sale solo.</p>
     <p class="regla">Se aplica únicamente en <b>terapia individual</b> y desde los
       <b>17 años</b>. En terapia grupal el código es del grupo, así que sus participantes
       no aparecen aquí.</p>
+
+<div class="loc" id="cajaLoc">
+      <label for="localidad">Localidad</label>
+      <select id="localidad" onchange="cambiarLocalidad()">
+        <option value="MB">Manabí — Milton Naula</option>
+        <option value="G">Guayaquil — Paola Vallejo</option>
+        <option value="M">Milagro — Mariana Solís</option>
+      </select>
+    </div>
 
     <div class="modo" role="tablist">
       <button role="tab" aria-selected="true"  onclick="verVista('aplicar',this)">Aplicar</button>
@@ -840,7 +858,7 @@ async function hacerBusqueda(suf){
   const caja=document.getElementById('hallazgos'+suf);
   caja.innerHTML='<p class="sub">Buscando…</p>';
   try{
-    const d=await pedir({accion:'buscar',texto:val('buscar'+suf)});
+    const d=await pedir({accion:'buscar',texto:val('buscar'+suf),localidad:LOC});
     if(!d.personas.length){
       caja.innerHTML='<div class="aviso neutro"><b>Sin coincidencias</b>'
         +'Las personas aparecen aquí después del primer encuentro, cuando se procesa '
@@ -958,8 +976,13 @@ async function guardar(){
     let html='<div class="aviso ok"><b>'+(d.reemplazado?'Aplicación actualizada':'Aplicación guardada')
       +'</b>'+esc(d.nombre)+' · puntaje bruto '+d.puntaje_bruto+' de 35'
       +(d.puntaje_metrico!==''?' · métrico '+d.puntaje_metrico:'')+'</div>';
-    if(d.comparacion)
-      html+='<div class="aviso ok" style="margin-top:8px"><b>Comparación completa</b>'+esc(d.frase)+'</div>';
+    if(d.comparacion){
+      const cp=d.comparacion;
+      html+='<div class="aviso ok" style="margin-top:8px"><b>Comparación completa</b>'
+        +'Pre '+cp.pre+' → Post '+cp.post+' · cambio '+(cp.cambio>0?'+':'')+cp.cambio
+        +(cp.porcentaje!==''?' · '+cp.porcentaje+'% de mejora':'')
+        +'<br>'+esc(d.frase)+'</div>';
+    }
     else if(MOMENTO==='pre')
       html+='<div class="aviso neutro" style="margin-top:8px"><b>Queda pendiente el post-test</b>'
           +'Cuando lo apliques, esta persona ya aparecerá con el post sugerido.</div>';
@@ -1069,10 +1092,12 @@ function hojaComparativa(d){
   +  '<tr><td class="et">Código ID:</td><td style="font-family:var(--mono);font-size:9px">'+esc(d.codigo)+'</td></tr>'
   +  '<tr><td class="et">Fechas:</td><td>Pre '+esc(d.pre.fecha)+' · Post '+esc(d.post.fecha)+'</td></tr>'
   + '</tbody></table>'
-  + '<div class="cifras">'
+  + '<div class="cifras" style="grid-template-columns:repeat(4,1fr)">'
   +  '<div class="cifra"><b>'+d.pre.bruto+'</b><span>Pre-test</span></div>'
   +  '<div class="cifra"><b>'+d.post.bruto+'</b><span>Post-test</span></div>'
-  +  '<div class="cifra"><b>'+signo+c+'</b><span>Cambio</span></div></div>'
+  +  '<div class="cifra"><b>'+signo+c+'</b><span>Cambio</span></div>'
+  +  '<div class="cifra"><b>'+(d.porcentaje===''?'—':d.porcentaje+'%')+'</b>'
+  +    '<span>Mejora</span></div></div>'
   + '<table class="of"><thead><tr><th class="izq">Afirmación</th>'
   +   '<th>Pre</th><th>Post</th><th>Dif.</th></tr></thead><tbody>'+filas
   +   '<tr><td style="font-weight:700">Puntaje total (7–35)</td>'
@@ -1088,13 +1113,21 @@ function hojaComparativa(d){
   + '</div>';
 }
 
+// promedio del % de mejora, solo sobre quienes tienen pre y post
+function promedio(filas){
+  const nums=filas.map(f=>parseFloat(String(f.porcentaje||'').replace('%','')))
+                  .filter(n=>!isNaN(n));
+  if(!nums.length) return '—';
+  return (Math.round(nums.reduce((a,b)=>a+b,0)/nums.length*10)/10)+'%';
+}
+
 // ---------------------------------------------------------- reporte
 async function cargarReporte(){
   const caja=document.getElementById('reporteSalida');
   const anon=document.getElementById('anon').checked;
   caja.innerHTML='<div class="cargando on">Calculando…</div>';
   try{
-    const d=await pedir({accion:'reporte',filtro:val('filtro')});
+    const d=await pedir({accion:'reporte',filtro:val('filtro'),localidad:LOC});
     if(!d.filas.length){
       caja.innerHTML='<div class="aviso error"><b>Sin resultados</b>No hay tests que coincidan.</div>';
       return;
@@ -1109,6 +1142,7 @@ async function cargarReporte(){
         +'<td class="c">'+(f.pre===''?'—':f.pre)+'</td>'
         +'<td class="c">'+(f.post===''?'—':f.post)+'</td>'
         +'<td class="c">'+(c===null?'—':(c>0?'+':'')+c)+'</td>'
+        +'<td class="c">'+(f.porcentaje?esc(f.porcentaje):'—')+'</td>'
         +'<td><span class="pill '+cl+'">'+esc(f.tendencia)+'</span></td></tr>';
     }).join('');
 
@@ -1116,17 +1150,24 @@ async function cargarReporte(){
       + bandaLogos()
       + '<h2>REPORTE DE MEJORA · PRE-TEST / POST-TEST</h2>'
       + '<p class="sub2">'+esc(d.institucion)+' — Escala Warwick-Edinburgh (SWEMWBS) · '
-      +   'umbral de cambio significativo: '+d.umbral+' puntos brutos</p>'
-      + '<div class="cifras">'
+      +   esc(d.localidad||'')+' · '+esc(d.profesional||'')
+      +   ' · umbral de cambio significativo: '+d.umbral+' puntos brutos</p>'
+      + '<div class="cifras" style="grid-template-columns:repeat(4,1fr)">'
       +  '<div class="cifra"><b>'+d.total+'</b><span>Participantes</span></div>'
       +  '<div class="cifra"><b>'+d.con_pre_y_post+'</b><span>Con pre y post</span></div>'
-      +  '<div class="cifra"><b>'+d.porcentaje_mejora+'%</b><span>Con mejora</span></div></div>'
+      +  '<div class="cifra"><b>'+d.porcentaje_mejora+'%</b><span>Con mejora</span></div>'
+      +  '<div class="cifra"><b>'+promedio(d.filas)+'</b><span>Mejora promedio</span></div></div>'
       + '<table class="of"><thead><tr>'
       +   '<th'+(anon?' class="izq oculto-print"':' class="izq"')+'>Nombre</th>'
       +   '<th class="izq">Código</th><th>Zona</th><th>Pre</th><th>Post</th>'
-      +   '<th>Cambio</th><th>Tendencia</th></tr></thead><tbody>'+filas+'</tbody></table>'
-      + '<p style="margin-top:12px;font-size:10px;color:#555">El porcentaje de mejora se '
-      +   'calcula solo sobre quienes tienen pre-test y post-test registrados.</p>'
+      +   '<th>Cambio</th><th>% mejora</th><th>Tendencia</th></tr></thead><tbody>'
+      +   filas+'</tbody></table>'
+      + '<div class="nota-metodo">'
+      +   '<b>Cómo se calcula.</b> '+esc(d.nota_formula||'')
+      +   ' El promedio y el porcentaje de participantes con mejora se computan solo sobre '
+      +   'quienes tienen ambas mediciones registradas. El umbral de cambio relevante es de '
+      +   d.umbral+' puntos brutos.'
+      + '</div>'
       + '<div class="firmas"><span>Elaborado por: '+esc(d.institucion)+'</span>'
       +   '<span>Firma: ______________________</span></div></div>'
       + '<button class="btn btn-tinta no-imprimir" onclick="window.print()">Imprimir reporte</button>';
