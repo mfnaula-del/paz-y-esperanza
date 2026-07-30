@@ -61,6 +61,10 @@ label{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:upperca
 .est-falta{background:#FDF3E3;color:#7A5410}
 .est-listo{background:#E3EFE0;color:#2C351F}
 .est-no{background:#FBEBE8;color:#7B241A}
+.aprox{display:inline-block;margin-left:6px;padding:2px 8px;border-radius:20px;font-size:10px;
+  font-weight:700;background:#EDEFF2;color:#5A6570}
+.pista{font-size:11.5px;color:var(--apagado);line-height:1.45;margin:2px 0 8px;padding:8px 10px;
+  background:#EEF0F3;border-radius:7px}
 
 .elegido{background:var(--oliva);color:#fff;border-radius:12px;padding:16px}
 .elegido .nom{font-size:18px;font-weight:600}
@@ -200,7 +204,10 @@ table.of td.c{text-align:center;width:11%}
     <section class="paso" id="secBuscar">
       <div class="paso-cabeza"><span class="paso-num">01</span><span class="paso-titulo">Participante</span></div>
       <div class="carta">
-        <input id="buscar" placeholder="Escribe el nombre…" oninput="buscarDebounce()" autocomplete="off">
+        <input id="buscar" placeholder="Nombre, o el número: 005" oninput="buscarDebounce()" autocomplete="off">
+        <p class="ayuda" style="font-size:11.5px;color:var(--apagado);margin-top:7px;line-height:1.45">
+          Aguanta errores de tipeo. Si no recuerdas cómo se escribe, prueba con el
+          número de participante.</p>
         <div class="hallazgos" id="hallazgos"></div>
       </div>
     </section>
@@ -237,7 +244,7 @@ table.of td.c{text-align:center;width:11%}
     <section class="paso no-imprimir">
       <div class="paso-cabeza"><span class="paso-num">01</span><span class="paso-titulo">Buscar</span></div>
       <div class="carta">
-        <input id="buscarF" placeholder="Nombre o código…" oninput="buscarDebounce('F')" autocomplete="off">
+        <input id="buscarF" placeholder="Nombre, código o número: 005" oninput="buscarDebounce('F')" autocomplete="off">
         <div class="hallazgos" id="hallazgosF"></div>
       </div>
     </section>
@@ -828,6 +835,21 @@ const LOGOS = [
 let INFO=null, PERSONA=null, MOMENTO='pre';
 let respuestas=[null,null,null,null,null,null,null], temporizador=null;
 
+// ---------------------------------------------------------- localidad
+// Viaja en el propio enlace, así cada persona guarda su acceso ya fijado.
+function localidadActual(){
+  const u=new URLSearchParams(location.search).get('loc');
+  return (u && ['MB','G','M'].indexOf(u)!==-1) ? u : 'MB';
+}
+function cambiarLocalidad(){
+  const v=document.getElementById('localidad').value;
+  const u=new URL(location.href);
+  u.searchParams.set('loc',v);
+  location.replace(u.toString());
+}
+const LOC=localidadActual();
+
+
 const val=id=>document.getElementById(id).value.trim();
 const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const cb=on=>'<span class="cb">'+(on?'☒':'☐')+'</span>';
@@ -866,7 +888,10 @@ async function hacerBusqueda(suf){
       return;
     }
     window['ULTIMA'+suf]=d.personas;
-    caja.innerHTML=d.personas.map((p,i)=>{
+    const pista = d.hubo_aproximados
+      ? '<p class="pista">No encontré una coincidencia exacta. Estos son los nombres '
+        +'más parecidos, ordenados por cercanía.</p>' : '';
+    caja.innerHTML = pista + d.personas.map((p,i)=>{
       const bloqueado = suf==='' && p.aplica===false;
       const cl = p.aplica===false ? 'est-no'
         : (p.estado==='Sin pre-test'?'est-sin':(p.estado==='Falta post-test'?'est-falta':'est-listo'));
@@ -877,7 +902,9 @@ async function hacerBusqueda(suf){
         +   (p.genero?esc(p.genero)+' · ':'')+(p.zona?esc(p.zona)+' · ':'')
         +   'desde '+esc(p.primer_encuentro)+'</div>'
         + '<div class="cod">'+esc(p.codigo)+'</div>'
-        + '<span class="marca-est '+cl+'">'+esc(p.motivo||p.estado)+'</span></button>';
+        + '<span class="marca-est '+cl+'">'+esc(p.motivo||p.estado)+'</span>'
+        + (p.aproximado?'<span class="aprox">parecido</span>':'')
+        + '</button>';
     }).join('');
   }catch(e){
     caja.innerHTML='<div class="aviso error"><b>No se pudo buscar</b>'+esc(e.message)+'</div>';
@@ -1176,6 +1203,7 @@ async function cargarReporte(){
   }
 }
 
+document.getElementById('localidad').value=LOC;
 cargarInfo();
 hacerBusqueda('');
 </script>
