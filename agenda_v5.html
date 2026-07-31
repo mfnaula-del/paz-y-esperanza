@@ -87,6 +87,13 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 .acciones button.si{border-color:var(--oliva);background:var(--oliva);color:#fff}
 .acciones button.no{border-color:#E7C9C3;color:#7B241A}
 
+.dispo{margin-top:11px;padding:12px 13px;border-radius:9px;font-size:13px;line-height:1.5;
+  background:#EDF1EC;border-left:3px solid var(--oliva);color:#2C351F}
+.dispo.especial{background:#FDF3E3;border-left-color:var(--ambar);color:#5C4210}
+.dispo b{display:block;margin-bottom:3px}
+.dispo.vacio{background:#EEF0F3;border-left-color:var(--apagado);color:#3A424C}
+.resumen-dispo{font-size:12px;line-height:1.5;color:var(--apagado);margin-top:9px;
+  padding-left:11px;border-left:2px solid var(--linea)}
 .dictar{background:var(--carta);border:1px solid var(--linea);border-radius:12px;padding:16px;
   margin-top:16px}
 .dictar.grabando{background:var(--tinta);border-color:#39414B}
@@ -174,8 +181,10 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
             <input id="nombre" placeholder="Juan Pérez Loor" autocomplete="off" oninput="revisar()">
           </div>
           <div class="campo ancho">
-            <label for="contacto">Teléfono o contacto (opcional)</label>
-            <input id="contacto" inputmode="tel" placeholder="09…">
+            <label for="contacto" id="lblContacto">Teléfono o contacto (opcional)</label>
+            <input id="contacto" inputmode="tel" placeholder="09…" oninput="revisar()">
+            <p class="ayuda" id="ayudaContacto" hidden>Obligatorio para atención virtual:
+              sin número no hay cómo comunicarse con la persona.</p>
           </div>
           <div class="campo ancho">
             <label for="codigo">Código, solo si ya es paciente</label>
@@ -194,7 +203,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
         <div class="rejilla">
           <div class="campo">
             <label for="fecha">Día</label>
-            <input id="fecha" type="date" onchange="revisar()">
+            <input id="fecha" type="date" onchange="cambiarFecha()">
           </div>
           <div class="campo">
             <label for="hora">Hora</label>
@@ -216,6 +225,13 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
               <option>Grupal</option>
             </select>
           </div>
+          <div class="campo">
+            <label for="atencion">Atención</label>
+            <select id="atencion" onchange="cambiarAtencion()">
+              <option>Presencial</option>
+              <option>Virtual</option>
+            </select>
+          </div>
           <div class="campo ancho">
             <label for="lugar">Lugar</label>
             <input id="lugar" list="lugares" placeholder="Manta">
@@ -229,6 +245,8 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
             <textarea id="motivo" placeholder="Derivación, primera valoración, seguimiento…"></textarea>
           </div>
         </div>
+        <div id="avisoDispo"></div>
+        <p class="resumen-dispo" id="resumenDispo" hidden></p>
       </div>
     </section>
 
@@ -262,7 +280,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 // ===========================================================================
 //  Pega aquí la MISMA URL /exec del Apps Script
 // ===========================================================================
-const URL_BACKEND = 'https://script.google.com/macros/s/AKfycbznImdt0wZkkJHl_xu5bWxjdhZAOS3Gyqbw1L086yO4MkGIDizfUBq4SfhdeJm0X1Lh/exec';
+const URL_BACKEND = 'PEGA_AQUI_TU_URL_DE_APPS_SCRIPT';
 
 let temporizador=null;
 // ---------------------------------------------------------- localidad
@@ -278,6 +296,10 @@ function cambiarLocalidad(){
   location.replace(u.toString());
 }
 const LOC=localidadActual();
+// ?solo=1 → enlace para quien solo agenda: sin acceso al resto del sistema
+if(new URLSearchParams(location.search).get('solo')==='1'){
+  document.querySelectorAll('a[href^="index.html"]').forEach(a=>a.remove());
+}
 document.getElementById('localidad').value=LOC;
 
 const val=id=>document.getElementById(id).value.trim();
@@ -301,8 +323,41 @@ async function pedir(datos){
 }
 
 function revisar(){
-  document.getElementById('btnGuardar').disabled =
-    !(val('nombre') && val('fecha') && val('hora'));
+  const virtual = val('atencion')==='Virtual';
+  const listo = val('nombre') && val('fecha') && val('hora') && (!virtual || val('contacto'));
+  const btn=document.getElementById('btnGuardar');
+  btn.disabled = !listo;
+  btn.textContent = (virtual && !val('contacto') && val('nombre'))
+    ? 'Falta el número de contacto' : 'Agendar cita';
+}
+
+function cambiarAtencion(){
+  const virtual = val('atencion')==='Virtual';
+  document.getElementById('lblContacto').textContent =
+    virtual ? 'Teléfono o contacto (obligatorio)' : 'Teléfono o contacto (opcional)';
+  document.getElementById('ayudaContacto').hidden = !virtual;
+  revisar();
+}
+
+// ---------------------------------------------------------- disponibilidad
+async function cambiarFecha(){
+  revisar();
+  const caja=document.getElementById('avisoDispo');
+  const res=document.getElementById('resumenDispo');
+  if(!val('fecha')){ caja.innerHTML=''; return; }
+  try{
+    const d=await pedir({accion:'agendaDia',profesional:LOC,fecha:val('fecha')});
+    if(d.resumen){ res.textContent=d.resumen; res.hidden=false; }
+    if(!d.disponibilidad){
+      caja.innerHTML='<div class="dispo vacio">Ese día no tiene un lugar fijo asignado. '
+        +'Confirma con el profesional antes de citar.</div>';
+      return;
+    }
+    const x=d.disponibilidad;
+    caja.innerHTML='<div class="dispo'+(x.especial?' especial':'')+'">'
+      +'<b>'+esc(x.dia)+' '+esc(x.fecha)+' · '+esc(x.lugar)+'</b>'
+      +esc(x.nota)+'</div>';
+  }catch(e){ caja.innerHTML=''; }
 }
 
 // ---------------------------------------------------------- dictado
@@ -475,7 +530,8 @@ async function guardar(forzar){
       nombre:val('nombre'), contacto:val('contacto'), codigo:val('codigo'),
       cuando:val('fecha')+'T'+val('hora'),
       duracion:val('duracion'), modalidad:val('modalidad'),
-      lugar:val('lugar'), motivo:val('motivo'), localidad:LOC,
+      lugar:val('lugar'), motivo:val('motivo'),
+      atencion:val('atencion'), profesional:LOC, localidad:LOC,
       forzar: forzar ? 'si' : ''
     });
     document.getElementById('cargando').classList.remove('on');
@@ -503,7 +559,10 @@ async function guardar(forzar){
     document.getElementById('salida').innerHTML=
       '<div class="aviso ok"><b>Cita agendada</b>'+esc(d.nombre)+' · '+esc(d.cuando)
       +(d.forzada?'<br>Quedó encima de otra cita, como pediste.':'')
+      +' · '+esc(d.atencion||'Presencial')
       +(d.calendario?'<br>También está en tu Google Calendar.':'')
+      +(d.disponibilidad&&d.disponibilidad.especial
+        ?'<br>Ese día hay salida a comunidad: '+esc(d.disponibilidad.nota):'')
       +'</div><div class="aviso neutro" style="margin-top:8px">'+esc(d.nota)+'</div>'
       +'<button class="btn btn-suave" onclick="limpiar()">Agendar a otra persona</button>';
   }catch(e){
@@ -575,7 +634,9 @@ function dibujar(c){
     + '<div class="cita-cab"><span class="nom">'+esc(c.nombre)+'</span>'
     +   '<span class="cuando">'+esc(c.cuando)+'–'+esc(c.hasta)+'</span></div>'
     + '<div class="meta">'+esc(c.dia)+(c.lugar?' · '+esc(c.lugar):'')
-    +   ' · '+esc(c.modalidad)+(c.contacto?' · '+esc(c.contacto):'')
+    +   ' · '+esc(c.modalidad)
+    +   (c.atencion==='Virtual'?' · <b>Virtual</b>':'')
+    +   (c.contacto?' · '+esc(c.contacto):'')
     +   (c.motivo?'<br>'+esc(c.motivo):'')+'</div>'
     + (c.codigo?'<div class="cod">'+esc(c.codigo)+'</div>':'')
     + etq + acciones + '</div>';
@@ -593,7 +654,8 @@ async function marcar(fila,estado){
 
 // fecha de hoy por defecto
 document.getElementById('fecha').value = new Date().toISOString().slice(0,10);
-revisar();
+cambiarAtencion();
+cambiarFecha();
 </script>
 </body>
 </html>
