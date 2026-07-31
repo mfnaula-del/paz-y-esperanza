@@ -25,8 +25,8 @@ h1{font-size:22px;font-weight:600;letter-spacing:-.02em;margin-top:4px}
        border-radius:6px;font-size:12.5px;line-height:1.5;color:#3A424C}
 
 .modo{display:flex;gap:2px;background:var(--linea);padding:2px;border-radius:10px;margin:20px 0}
-.modo button{flex:1;padding:10px 4px;border:0;background:transparent;border-radius:8px;
-             font-family:inherit;font-size:13.5px;font-weight:600;color:var(--oliva);cursor:pointer}
+.modo button{flex:1;padding:10px 3px;border:0;background:transparent;border-radius:8px;
+             font-family:inherit;font-size:12.5px;font-weight:600;color:var(--oliva);cursor:pointer}
 .modo button[aria-selected="true"]{background:var(--carta);color:var(--tinta);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .vista{display:none} .vista.on{display:block}
 
@@ -143,6 +143,62 @@ table.of td.c{text-align:center;width:11%}
 .cifra{border:1px solid #9aa5b1;padding:9px;text-align:center}
 .cifra b{display:block;font-family:var(--mono);font-size:21px;font-weight:400;color:var(--azul)}
 .cifra span{font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:#555}
+.grupo-card{background:var(--carta);border:1px solid var(--linea);border-radius:11px;
+  padding:13px 14px;cursor:pointer;width:100%;text-align:left;font-family:inherit;color:inherit}
+.grupo-card:hover{border-color:var(--oliva)}
+.grupo-card .cod{font-family:var(--mono);font-size:10.5px;color:var(--apagado);word-break:break-all}
+.grupo-card .tema{font-size:15px;font-weight:600;margin-top:3px}
+.grupo-card .meta{font-size:12px;color:var(--apagado);margin-top:4px}
+
+.cabecera-grupo{background:var(--oliva);color:#fff;border-radius:12px;padding:15px 16px}
+.cabecera-grupo .tema{font-size:17px;font-weight:600}
+.cabecera-grupo .cod{font-family:var(--mono);font-size:10.5px;opacity:.75;margin-top:6px;word-break:break-all}
+.cabecera-grupo .meta{font-size:12px;opacity:.85;margin-top:5px}
+.cabecera-grupo .cambiar{background:none;border:0;color:#fff;opacity:.7;font-family:inherit;
+  font-size:12px;text-decoration:underline;cursor:pointer;margin-top:11px;padding:0}
+
+.acciones-grupo{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.acciones-grupo .btn{margin-top:0}
+
+.pgrupo{border:1px solid var(--linea);border-radius:10px;background:#FBFBFA;overflow:hidden}
+.pgrupo + .pgrupo{margin-top:8px}
+.pgrupo.no{opacity:.5}
+.pgrupo.lista{border-color:var(--oliva)}
+.pgrupo-cab{display:flex;align-items:center;gap:10px;padding:12px 13px;cursor:pointer;
+  background:none;border:0;width:100%;text-align:left;font-family:inherit;color:inherit}
+.pgrupo-cab:disabled{cursor:not-allowed}
+.pgrupo .nom{flex:1;min-width:0;font-size:14.5px;font-weight:600;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.pgrupo .sub{font-size:11.5px;color:var(--apagado);font-weight:400;margin-top:2px}
+.pgrupo .marca{font-family:var(--mono);font-size:13px;font-weight:700;white-space:nowrap}
+.pgrupo .marca.ok{color:var(--oliva)} .pgrupo .marca.falta{color:var(--apagado)}
+.pgrupo-items{padding:0 13px 13px;border-top:1px solid var(--linea);background:#fff}
+.pgrupo-items[hidden]{display:none}
+.fila-item{padding:10px 0;border-bottom:1px solid var(--linea)}
+.fila-item:last-child{border-bottom:0}
+.fila-item p{font-size:13px;line-height:1.4;margin-bottom:8px}
+.fila-item p i{font-family:var(--mono);font-size:10.5px;color:var(--oliva);font-style:normal;
+  margin-right:6px;font-weight:700}
+.mini{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.mini button{padding:9px 2px;border:1px solid var(--linea);background:#FBFBFA;border-radius:7px;
+  font-family:var(--mono);font-size:13px;font-weight:600;color:var(--apagado);cursor:pointer}
+.mini button[aria-pressed="true"]{background:var(--oliva);border-color:var(--oliva);color:#fff}
+.mini button.dudosa{border-color:var(--ambar);background:#FDF3E3;color:var(--ambar)}
+
+.resumen-grupo{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.resumen-grupo div{background:var(--carta);border:1px solid var(--linea);border-radius:9px;
+  padding:10px;text-align:center}
+.resumen-grupo b{display:block;font-family:var(--mono);font-size:20px;font-weight:400;color:var(--oliva)}
+.resumen-grupo span{font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--apagado)}
+
+.sin-emparejar{background:#FDF3E3;border-left:3px solid var(--ambar);border-radius:9px;
+  padding:12px 13px;margin-top:10px;font-size:13px;line-height:1.5;color:#5C4210}
+.sin-emparejar select{margin-top:7px;font-size:14px;padding:8px}
+.subir-esc{display:block;text-align:center;border:1px dashed var(--linea);border-radius:10px;
+  padding:14px;font-size:14px;color:var(--oliva);cursor:pointer;background:#FBFBFA}
+.subir-esc:hover{border-color:var(--oliva)}
+.subir-esc input{display:none}
+
 .nota-metodo{margin-top:16px;padding:9px 11px;border-left:2px solid #9aa5b1;background:#F6F7F9;
   font-size:9.5px;line-height:1.5;color:#555;border-radius:0 4px 4px 0}
 .nota-metodo b{color:var(--azul)}
@@ -169,6 +225,11 @@ table.of td.c{text-align:center;width:11%}
     -webkit-print-color-adjust:exact;print-color-adjust:exact}
   tr{page-break-inside:avoid}
   .oculto-print{display:none!important}
+  /* al imprimir las hojas en blanco solo debe salir #gImpresion,
+     no la pantalla de trabajo del módulo grupal */
+  #v-grupal .paso, #v-grupal .cabecera-grupo, #v-grupal .acciones-grupo,
+  #v-grupal .resumen-grupo, #gAviso, #gSalida{display:none!important}
+  #gImpresion, #gImpresion .hoja{display:block!important}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -195,7 +256,8 @@ table.of td.c{text-align:center;width:11%}
     </div>
 
     <div class="modo" role="tablist">
-      <button role="tab" aria-selected="true"  onclick="verVista('aplicar',this)">Aplicar</button>
+      <button role="tab" aria-selected="true"  onclick="verVista('aplicar',this)">Individual</button>
+      <button role="tab" aria-selected="false" onclick="verVista('grupal',this)">Grupal</button>
       <button role="tab" aria-selected="false" onclick="verVista('ficha',this)">Ficha</button>
       <button role="tab" aria-selected="false" onclick="verVista('reporte',this)">Reporte</button>
     </div>
@@ -239,6 +301,45 @@ table.of td.c{text-align:center;width:11%}
         <div id="salida"></div>
       </div>
     </section>
+  </div>
+
+
+  <!-- ================= GRUPAL ================= -->
+  <div class="vista" id="v-grupal">
+
+    <section class="paso no-imprimir" id="gSelector">
+      <div class="paso-cabeza"><span class="paso-num">01</span><span class="paso-titulo">Grupo</span></div>
+      <div class="carta">
+        <p class="ayuda" style="margin-bottom:11px">Los grupos aparecen aquí cuando se
+          procesa la lista de asistencia de su primera sesión.</p>
+        <div id="gLista"><p class="sub">Cargando…</p></div>
+      </div>
+    </section>
+
+    <section class="paso no-imprimir" id="gElegido" hidden>
+      <div class="paso-cabeza"><span class="paso-num">01</span><span class="paso-titulo">Grupo</span></div>
+      <div class="cabecera-grupo" id="gCabecera"></div>
+      <div class="acciones-grupo">
+        <button class="btn btn-suave" onclick="gImprimirBlanco()">Imprimir hojas en blanco</button>
+        <label class="subir-esc">
+          Subir hojas escaneadas
+          <input type="file" id="gEscaneos" accept="image/*,application/pdf" multiple
+                 onchange="gLeerEscaneos(this)">
+        </label>
+      </div>
+      <div class="cargando" id="gCargando"></div>
+      <div id="gAviso"></div>
+    </section>
+
+    <section class="paso no-imprimir" id="gGrilla" hidden>
+      <div class="paso-cabeza"><span class="paso-num">02</span><span class="paso-titulo">Respuestas</span></div>
+      <div class="resumen-grupo" id="gResumen"></div>
+      <div id="gParticipantes"></div>
+      <button class="btn btn-enviar" id="gGuardar" onclick="gGuardarTodo()" disabled>Guardar</button>
+      <div id="gSalida"></div>
+    </section>
+
+    <div id="gImpresion"></div>
   </div>
 
   <!-- ================= FICHA ================= -->
@@ -861,6 +962,7 @@ function verVista(v,btn){
   document.getElementById('v-'+v).classList.add('on');
   document.querySelectorAll('.modo button').forEach(b=>b.setAttribute('aria-selected','false'));
   btn.setAttribute('aria-selected','true');
+  if(v==='grupal' && !GRUPO) gCargarGrupos();
 }
 
 async function pedir(datos){
@@ -1161,6 +1263,330 @@ function promedio(filas){
                   .filter(n=>!isNaN(n));
   if(!nums.length) return '—';
   return (Math.round(nums.reduce((a,b)=>a+b,0)/nums.length*10)/10)+'%';
+}
+
+
+// ============================================================================
+//  GRUPAL
+// ============================================================================
+let GRUPO = null, GPART = [], GMOMENTO = 'pre', GINFO = null;
+
+async function gCargarGrupos(){
+  const caja=document.getElementById('gLista');
+  caja.innerHTML='<p class="sub">Cargando…</p>';
+  try{
+    const d=await pedir({accion:'grupos',localidad:LOC});
+    if(!d.grupos.length){
+      caja.innerHTML='<div class="aviso neutro"><b>Todavía no hay grupos</b>'
+        +'Aparecen aquí cuando dictas la primera sesión grupal y subes la lista de '
+        +'asistencia.</div>';
+      return;
+    }
+    caja.innerHTML='<div style="display:flex;flex-direction:column;gap:8px">'
+      + d.grupos.map((g,i)=>
+        '<button class="grupo-card" onclick="gElegir('+i+')">'
+        + '<div class="tema">'+esc(g.nombre||'Grupo sin nombre')+'</div>'
+        + '<div class="meta">'+g.participantes+' participantes · '
+        +   (g.sesiones||0)+' de 3 sesiones'
+        +   (g.sesiones>=3?' · proceso cerrado':'')+'</div>'
+        + '<div class="cod">'+esc(g.codigo)+'</div></button>').join('')
+      + '</div>';
+    window.GRUPOS=d.grupos;
+  }catch(e){
+    caja.innerHTML='<div class="aviso error"><b>No se pudo cargar</b>'+esc(e.message)+'</div>';
+  }
+}
+
+async function gElegir(i){
+  GRUPO=window.GRUPOS[i];
+  document.getElementById('gSelector').hidden=true;
+  document.getElementById('gElegido').hidden=false;
+  await gRefrescar();
+  document.getElementById('gElegido').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function gVolver(){
+  GRUPO=null; GPART=[]; GINFO=null;
+  document.getElementById('gSelector').hidden=false;
+  ['gElegido','gGrilla'].forEach(x=>document.getElementById(x).hidden=true);
+  document.getElementById('gSalida').innerHTML='';
+  document.getElementById('gAviso').innerHTML='';
+  document.getElementById('gImpresion').innerHTML='';
+}
+
+async function gRefrescar(){
+  const cg=document.getElementById('gCargando');
+  cg.classList.add('on'); cg.textContent='Cargando el grupo…';
+  try{
+    const d=await pedir({accion:'grilla',codigo:GRUPO.codigo,localidad:LOC});
+    GINFO=d;
+    if(d.cerrado && !GMOMENTO_TOCADO) GMOMENTO='post';
+    gPintarCabecera();
+    gPintarGrilla();
+    document.getElementById('gGrilla').hidden=false;
+  }catch(e){
+    document.getElementById('gAviso').innerHTML=
+      '<div class="aviso error"><b>Error</b>'+esc(e.message)+'</div>';
+  }
+  cg.classList.remove('on');
+}
+
+let GMOMENTO_TOCADO=false;
+function gPonerMomento(v){
+  GMOMENTO=v; GMOMENTO_TOCADO=true;
+  gPintarCabecera(); gPintarGrilla();
+}
+
+function gPintarCabecera(){
+  const d=GINFO;
+  const chip=(v,txt)=>'<button class="chip" aria-pressed="'+(GMOMENTO===v)+'" '
+    +'onclick="gPonerMomento(\''+v+'\')">'+txt+'</button>';
+  document.getElementById('gCabecera').innerHTML=
+      '<div class="tema">'+esc(d.tema||GRUPO.nombre||'Grupo')+'</div>'
+    + '<div class="meta">'+d.total+' participantes · '+d.aplicables+' de '+d.edad_minima
+    +   ' años o más · sesión '+d.sesiones+' de '+d.sesiones_para_cerrar
+    +   (d.cerrado?' · proceso cerrado':'')+'</div>'
+    + '<div class="cod">'+esc(d.codigo)+'</div>'
+    + '<div class="auto"><span class="chip-lbl">Momento</span>'
+    +   chip('pre','Pre-test')+chip('post','Post-test')+'</div>'
+    + '<button class="cambiar" onclick="gVolver()">Elegir otro grupo</button>';
+}
+
+function gPintarGrilla(){
+  const d=GINFO;
+  // estado local de las respuestas de cada participante
+  GPART = d.participantes.map(p=>{
+    const yaHay = GMOMENTO==='pre' ? p.pre : p.post;
+    return {...p, resp: yaHay ? yaHay.slice() : [null,null,null,null,null,null,null],
+            dudas:[], abierto:false};
+  });
+  gDibujarParticipantes();
+}
+
+function gDibujarParticipantes(){
+  const d=GINFO;
+  document.getElementById('gParticipantes').innerHTML = GPART.map((p,i)=>{
+    if(!p.aplica) return '<div class="pgrupo no"><div class="pgrupo-cab" style="cursor:default">'
+      +'<span class="nom">'+esc(p.nombre)+'<span class="sub">'+esc(p.estado)+'</span></span>'
+      +'<span class="marca falta">—</span></div></div>';
+
+    const n=p.resp.filter(x=>x!==null).length;
+    const total=p.resp.reduce((a,b)=>a+(b||0),0);
+    const listo=n===7;
+    return '<div class="pgrupo'+(listo?' lista':'')+'">'
+      + '<button class="pgrupo-cab" onclick="gAbrir('+i+')">'
+      +   '<span class="nom">'+esc(p.nombre)
+      +     '<span class="sub">'+(p.edad?esc(p.edad)+' años · ':'')+esc(p.estado)+'</span></span>'
+      +   '<span class="marca '+(listo?'ok':'falta')+'">'+(listo?total+'/35':n+'/7')+'</span>'
+      + '</button>'
+      + '<div class="pgrupo-items" '+(p.abierto?'':'hidden')+'>'
+      +   d.items.map((t,j)=>
+          '<div class="fila-item"><p><i>'+(j+1)+'</i>'+esc(t)+'</p><div class="mini">'
+          + d.niveles.map((nv,k)=>'<button type="button" aria-pressed="'+(p.resp[j]===k+1)+'" '
+              +'class="'+(p.dudas.indexOf(j+1)!==-1?'dudosa':'')+'" aria-label="'+esc(nv)+'" '
+              +'onclick="gMarcar('+i+','+j+','+(k+1)+')">'+(k+1)+'</button>').join('')
+          + '</div></div>').join('')
+      + '</div></div>';
+  }).join('');
+
+  const listos=GPART.filter(p=>p.aplica && p.resp.every(x=>x!==null)).length;
+  const conDudas=GPART.filter(p=>p.dudas.length).length;
+  document.getElementById('gResumen').innerHTML=
+      '<div><b>'+d.aplicables+'</b><span>Les toca</span></div>'
+    + '<div><b>'+listos+'</b><span>Completos</span></div>'
+    + '<div><b>'+(d.desertores||0)+'</b><span>Posibles desertores</span></div>';
+  const btn=document.getElementById('gGuardar');
+  btn.disabled = listos===0;
+  btn.textContent = listos ? 'Guardar '+listos+' de '+d.aplicables
+                           : 'Marca al menos una persona completa';
+  if(conDudas) document.getElementById('gAviso').innerHTML=
+    '<div class="aviso neutro" style="margin-top:10px"><b>Hay respuestas dudosas</b>'
+    +'Las casillas en ámbar no se pudieron leer con seguridad. Revísalas antes de guardar.</div>';
+}
+
+function gAbrir(i){ GPART[i].abierto=!GPART[i].abierto; gDibujarParticipantes(); }
+function gMarcar(i,j,v){
+  GPART[i].resp[j]=v;
+  GPART[i].dudas=GPART[i].dudas.filter(x=>x!==j+1);
+  GPART[i].abierto=true;
+  gDibujarParticipantes();
+}
+
+// ---------------------------------------------------------- escaneos
+async function gLeerEscaneos(input){
+  const files=[...input.files]; input.value='';
+  if(!files.length) return;
+  const cg=document.getElementById('gCargando');
+  cg.classList.add('on');
+  cg.textContent='Leyendo '+files.length+' hoja(s)… puede tardar un minuto.';
+  document.getElementById('gAviso').innerHTML='';
+  try{
+    const cuerpo=new URLSearchParams();
+    cuerpo.append('accion','leerEscaneos');
+    cuerpo.append('codigo',GRUPO.codigo);
+    cuerpo.append('localidad',LOC);
+    cuerpo.append('momento',GMOMENTO);
+    for(const f of files){
+      const a = f.type==='application/pdf' ? await gLeerPdf(f) : await gComprimir(f);
+      cuerpo.append('adjunto',a.b64);
+      cuerpo.append('adjuntoMime',a.mime);
+    }
+    const r=await fetch(URL_BACKEND,{method:'POST',body:cuerpo});
+    const d=await r.json();
+    cg.classList.remove('on');
+    if(!d.exito) throw new Error(d.error||'error');
+    gAplicarLectura(d);
+  }catch(e){
+    cg.classList.remove('on');
+    document.getElementById('gAviso').innerHTML=
+      '<div class="aviso error"><b>No se pudo leer</b>'+esc(e.message)+'</div>';
+  }
+}
+
+function gAplicarLectura(d){
+  let puestas=0;
+  const huerfanas=[];
+  d.hojas.forEach(hoja=>{
+    if(!hoja.nombre){ huerfanas.push(hoja); return; }
+    const i=GPART.findIndex(p=>p.nombre===hoja.nombre);
+    if(i===-1){ huerfanas.push(hoja); return; }
+    GPART[i].resp = hoja.respuestas.map(v=> (v>=1&&v<=5)?v:null);
+    GPART[i].dudas = (hoja.dudas||[]).concat(
+      hoja.respuestas.map((v,j)=>(v>=1&&v<=5)?null:j+1).filter(x=>x));
+    GPART[i].abierto = GPART[i].dudas.length>0;
+    puestas++;
+  });
+  gDibujarParticipantes();
+
+  let aviso='<div class="aviso ok"><b>'+puestas+' hoja(s) leídas</b>'
+    +'Revisa que las respuestas coincidan con el papel antes de guardar.</div>';
+  if(d.incompletas) aviso+='<div class="aviso neutro" style="margin-top:8px">'
+    +'<b>'+d.incompletas+' con filas sin marca clara</b>'
+    +'Las dejé en blanco a propósito: es preferible que las completes tú a que el sistema '
+    +'adivine un puntaje.</div>';
+  if(huerfanas.length) aviso+='<div class="sin-emparejar"><b>'+huerfanas.length
+    +' hoja(s) sin dueño</b>No pude decidir de quién son. '
+    +'Los nombres que leí fueron: '+huerfanas.map(x=>esc(x.leido||'(ilegible)')).join(', ')
+    +'. Llénalas a mano tocando el nombre en la lista.</div>';
+  document.getElementById('gAviso').innerHTML=aviso;
+}
+
+function gComprimir(f){
+  return new Promise((ok,mal)=>{
+    const img=new Image();
+    img.onload=()=>{
+      const max=2200, e=Math.min(1,max/Math.max(img.width,img.height));
+      const cv=document.createElement('canvas');
+      cv.width=Math.round(img.width*e); cv.height=Math.round(img.height*e);
+      const cx=cv.getContext('2d');
+      cx.fillStyle='#fff'; cx.fillRect(0,0,cv.width,cv.height);
+      cx.drawImage(img,0,0,cv.width,cv.height);
+      URL.revokeObjectURL(img.src);
+      ok({b64:cv.toDataURL('image/jpeg',0.85).split(',')[1], mime:'image/jpeg'});
+    };
+    img.onerror=()=>mal(new Error('no se pudo leer '+f.name));
+    img.src=URL.createObjectURL(f);
+  });
+}
+function gLeerPdf(f){
+  return new Promise((ok,mal)=>{
+    if(f.size>12*1048576) return mal(new Error(f.name+' pesa más de 12 MB'));
+    const fr=new FileReader();
+    fr.onloadend=()=>ok({b64:fr.result.split(',')[1], mime:'application/pdf'});
+    fr.onerror=()=>mal(new Error('no se pudo leer '+f.name));
+    fr.readAsDataURL(f);
+  });
+}
+
+// ---------------------------------------------------------- guardar
+async function gGuardarTodo(){
+  const lote=GPART.filter(p=>p.aplica && p.resp.every(x=>x!==null))
+    .map(p=>({nombre:p.nombre, edad:p.edad, genero:p.genero, vbg:p.vbg,
+              discapacidad:p.discapacidad, respuestas:p.resp}));
+  if(!lote.length) return;
+
+  const btn=document.getElementById('gGuardar');
+  btn.disabled=true; btn.textContent='Guardando…';
+  try{
+    const d=await pedir({accion:'guardarGrupo',codigo:GRUPO.codigo,momento:GMOMENTO,
+                         localidad:LOC,respuestas:JSON.stringify(lote)});
+    let html='<div class="aviso ok"><b>'+d.guardados+' guardadas</b>'
+      +esc(d.nombres.slice(0,6).join(', '))+(d.nombres.length>6?' y otras…':'')+'</div>';
+    if(d.saltados.length) html+='<div class="aviso neutro" style="margin-top:8px">'
+      +'<b>'+d.saltados.length+' quedaron fuera</b>'+esc(d.saltados.join(' · '))+'</div>';
+    document.getElementById('gSalida').innerHTML=html;
+    GINFO=d.grilla; gPintarGrilla();
+  }catch(e){
+    document.getElementById('gSalida').innerHTML=
+      '<div class="aviso error"><b>No se pudo guardar</b>'+esc(e.message)+'</div>';
+    btn.disabled=false;
+  }
+}
+
+// ---------------------------------------------------------- hojas en blanco
+async function gImprimirBlanco(){
+  const cg=document.getElementById('gCargando');
+  cg.classList.add('on'); cg.textContent='Preparando las hojas…';
+  try{
+    const d=await pedir({accion:'hojasBlanco',codigo:GRUPO.codigo,
+                         localidad:LOC,momento:GMOMENTO});
+    cg.classList.remove('on');
+    if(!d.participantes.length){
+      document.getElementById('gAviso').innerHTML=
+        '<div class="aviso neutro"><b>Nadie para imprimir</b>'
+        +'Ningún participante de este grupo tiene '+d.edad_minima+' años o más.</div>';
+      return;
+    }
+    document.getElementById('gImpresion').innerHTML=
+      d.participantes.map(p=>gHojaBlanco(d,p)).join('');
+    if(d.excluidos) document.getElementById('gAviso').innerHTML=
+      '<div class="aviso neutro"><b>'+d.imprimibles+' hojas listas</b>'
+      +d.excluidos+' participante(s) quedaron fuera por ser menores de '+d.edad_minima
+      +' años.</div>';
+    setTimeout(()=>window.print(), 400);
+  }catch(e){
+    cg.classList.remove('on');
+    document.getElementById('gAviso').innerHTML=
+      '<div class="aviso error"><b>Error</b>'+esc(e.message)+'</div>';
+  }
+}
+
+function gHojaBlanco(d,p){
+  const filas=d.items.map((t,i)=>
+    '<tr><td>'+(i+1)+'. '+esc(t)+'</td>'
+    + d.niveles.map(()=>'<td class="c"><span class="cb">☐</span></td>').join('')
+    + '</tr>').join('');
+  return '<div class="hoja">'
+  + bandaLogos()
+  + '<h2>ESCALA WARWICK-EDINBURGH DE BIENESTAR MENTAL — VERSIÓN CORTA (SWEMWBS)</h2>'
+  + '<p class="sub1">Formulario de aplicación — Terapia grupal ('
+  +   (d.momento==='post'?'Post-test':'Pre-test')+')</p>'
+  + '<p class="sub2">'+esc(d.institucion)+' — Protección local y asistencia humanitaria</p>'
+  + '<table class="of"><tbody>'
+  +  '<tr><td class="et">Nombre y apellido:</td><td>'+esc(p.nombre)+'</td>'
+  +      '<td class="et">Código del grupo:</td>'
+  +      '<td style="font-family:var(--mono);font-size:9px">'+esc(d.codigo)+'</td></tr>'
+  +  '<tr><td class="et">Fecha de aplicación:</td><td></td>'
+  +      '<td class="et">Momento:</td><td>'
+  +        (d.momento==='pre'?'☒':'☐')+' Pre-test &nbsp; '
+  +        (d.momento==='post'?'☒':'☐')+' Post-test</td></tr>'
+  +  '<tr><td class="et">Edad:</td><td>'+esc(p.edad)+'</td>'
+  +      '<td class="et">Género:</td><td>'+esc(p.genero||'')+'</td></tr>'
+  + '</tbody></table>'
+  + '<h3>INSTRUCCIONES</h3><p>'+esc(d.consigna)+'</p>'
+  + '<table class="of" style="margin-top:10px"><thead><tr>'
+  +   '<th class="izq">'+esc(d.encabezado_tabla)+'</th>'
+  +   d.niveles.map((n,i)=>'<th>'+esc(n)+'<br>('+(i+1)+')</th>').join('')
+  + '</tr></thead><tbody>'+filas+'</tbody></table>'
+  + '<h3>PUNTAJE (uso exclusivo del/la aplicador/a)</h3>'
+  + '<table class="of puntaje"><tbody>'
+  +  '<tr><td class="et">Suma de las 7 respuestas (puntaje bruto):</td><td></td></tr>'
+  +  '<tr><td class="et" colspan="2" style="font-weight:400;background:#fff">'
+  +      esc(d.nota_rango)+'</td></tr>'
+  + '</tbody></table>'
+  + '<p style="margin-top:12px"><b>Observaciones:</b></p><div class="obs"></div>'
+  + bloqueFirmas('')
+  + '</div>';
 }
 
 // ---------------------------------------------------------- reporte
