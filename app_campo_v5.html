@@ -127,38 +127,15 @@ body.grabando .subir{background:#1B2027;border-color:#39414B;color:#9AA6B2}
   <p class="sub">Dicta la sesión o adjunta tus notas. El sistema redacta el documento.</p>
 
 <div class="loc" id="cajaLoc">
-    <label for="localidad">Localidad</label>
-    <select id="localidad" onchange="cambiarLocalidad()">
-      <option value="MB">Manabí — Milton Naula</option>
-      <option value="G">Guayaquil — Paola Vallejo</option>
-      <option value="M">Milagro — Mariana Solís</option>
+    <label for="profesional">Profesional</label>
+    <select id="profesional" onchange="cambiarProfesional()">
+      <option value="MN">Milton Naula — Manabí</option>
+      <option value="PV">Paola Vallejo — Guayaquil</option>
+      <option value="PO">Paulina Ortega — Guayaquil</option>
+      <option value="MS">Mariana Solís — Milagro</option>
+      <option value="NR">Narcisa Rubio — Milagro</option>
     </select>
   </div>
-
-  <div class="modo" role="tablist">
-    <button role="tab" aria-selected="true"  onclick="ponerModo('TI',this)">Individual</button>
-    <button role="tab" aria-selected="false" onclick="ponerModo('TG',this)">Grupal</button>
-  </div>
-  <p class="explica" id="explica"></p>
-
-  <section class="paso">
-    <div class="paso-cabeza"><span class="paso-num">01</span><span class="paso-titulo">Identificar</span></div>
-    <div class="carta">
-      <div class="rejilla">
-        <div class="campo ancho">
-          <label for="lugar">Lugar</label>
-          <select id="lugar" onchange="pintarCodigo()"></select>
-        </div>
-        <div class="campo">
-          <label for="num" id="lblNum">N° de paciente</label>
-          <input id="num" type="number" inputmode="numeric" min="1" placeholder="5" oninput="pintarCodigo()">
-        </div>
-        <div class="campo">
-          <label for="sesion">N° de sesión</label>
-          <input id="sesion" type="number" inputmode="numeric" min="1" value="1">
-        </div>
-
-      </div>
       <div class="codigo" id="codigo">Completa los campos para generar el código</div>
     </div>
   </section>
@@ -245,20 +222,35 @@ const AYUDA_ADJ={
 };
 
 let modo='TI', wavBlob=null;
-// ---------------------------------------------------------- localidad
-// Se recuerda en el propio enlace, así cada persona guarda su acceso ya fijado.
-function localidadActual(){
-  const u=new URLSearchParams(location.search).get('loc');
-  return (u && ['MB','G','M'].indexOf(u)!==-1) ? u : 'MB';
+// ---------------------------------------------------------- profesional
+// Quién está usando el sistema. Viaja en el enlace (?prof=PV) para que cada
+// una guarde su acceso ya fijado. De aquí sale su localidad, su agenda y la
+// firma de sus documentos.
+const PROFESIONALES = {
+  MN:{nombre:'Milton Naula',   loc:'MB', localidad:'Manabí'},
+  PV:{nombre:'Paola Vallejo',  loc:'G',  localidad:'Guayaquil'},
+  PO:{nombre:'Paulina Ortega', loc:'G',  localidad:'Guayaquil'},
+  MS:{nombre:'Mariana Solís',  loc:'M',  localidad:'Milagro'},
+  NR:{nombre:'Narcisa Rubio',  loc:'M',  localidad:'Milagro'}
+};
+function profesionalActual(){
+  const u=new URLSearchParams(location.search).get('prof');
+  if(PROFESIONALES[u]) return u;
+  // compatibilidad con los enlaces viejos que llevaban ?loc=
+  const l=new URLSearchParams(location.search).get('loc');
+  const porLoc={MB:'MN',G:'PV',M:'MS'};
+  return porLoc[l] || 'MN';
 }
-function cambiarLocalidad(){
-  const v=document.getElementById('localidad').value;
+function cambiarProfesional(){
+  const v=document.getElementById('profesional').value;
   const u=new URL(location.href);
-  u.searchParams.set('loc',v);
+  u.searchParams.set('prof',v);
+  u.searchParams.delete('loc');
   location.replace(u.toString());
 }
-const LOC=localidadActual();
-document.getElementById('localidad').value=LOC;
+const PROF = profesionalActual();
+const LOC  = PROFESIONALES[PROF].loc;
+document.getElementById('profesional').value=PROF;
 
 let ctx,fuente,proc,pista,trozos=[],hzOrigen=48000,grabando=false,t0,cronometro;
 const val=id=>document.getElementById(id).value.trim();
@@ -480,6 +472,7 @@ async function enviar(){
     cuerpo.append('tipo',modo);
     cuerpo.append('codigo',codigo);
     cuerpo.append('sesion',val('sesion')||'1');
+    cuerpo.append('profesional',PROF);
     if(audio){
       cuerpo.append('audio',audio);
       cuerpo.append('audioMime','audio/wav');

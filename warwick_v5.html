@@ -247,20 +247,14 @@ table.of td.c{text-align:center;width:11%}
       no aparecen aquí.</p>
 
 <div class="loc" id="cajaLoc">
-      <label for="localidad">Localidad</label>
-      <select id="localidad" onchange="cambiarLocalidad()">
-        <option value="MB">Manabí — Milton Naula</option>
-        <option value="G">Guayaquil — Paola Vallejo</option>
-        <option value="M">Milagro — Mariana Solís</option>
-      </select>
-    </div>
-
-    <div class="modo" role="tablist">
-      <button role="tab" aria-selected="true"  onclick="verVista('aplicar',this)">Individual</button>
-      <button role="tab" aria-selected="false" onclick="verVista('grupal',this)">Grupal</button>
-      <button role="tab" aria-selected="false" onclick="verVista('ficha',this)">Ficha</button>
-      <button role="tab" aria-selected="false" onclick="verVista('reporte',this)">Reporte</button>
-    </div>
+    <label for="profesional">Profesional</label>
+    <select id="profesional" onchange="cambiarProfesional()">
+      <option value="MN">Milton Naula — Manabí</option>
+      <option value="PV">Paola Vallejo — Guayaquil</option>
+      <option value="PO">Paulina Ortega — Guayaquil</option>
+      <option value="MS">Mariana Solís — Milagro</option>
+      <option value="NR">Narcisa Rubio — Milagro</option>
+    </select>
   </div>
 
   <!-- ================= APLICAR ================= -->
@@ -938,19 +932,34 @@ const LOGOS = [
 let INFO=null, PERSONA=null, MOMENTO='pre';
 let respuestas=[null,null,null,null,null,null,null], temporizador=null;
 
-// ---------------------------------------------------------- localidad
-// Viaja en el propio enlace, así cada persona guarda su acceso ya fijado.
-function localidadActual(){
-  const u=new URLSearchParams(location.search).get('loc');
-  return (u && ['MB','G','M'].indexOf(u)!==-1) ? u : 'MB';
+// ---------------------------------------------------------- profesional
+// Quién está usando el sistema. Viaja en el enlace (?prof=PV) para que cada
+// una guarde su acceso ya fijado. De aquí sale su localidad, su agenda y la
+// firma de sus documentos.
+const PROFESIONALES = {
+  MN:{nombre:'Milton Naula',   loc:'MB', localidad:'Manabí'},
+  PV:{nombre:'Paola Vallejo',  loc:'G',  localidad:'Guayaquil'},
+  PO:{nombre:'Paulina Ortega', loc:'G',  localidad:'Guayaquil'},
+  MS:{nombre:'Mariana Solís',  loc:'M',  localidad:'Milagro'},
+  NR:{nombre:'Narcisa Rubio',  loc:'M',  localidad:'Milagro'}
+};
+function profesionalActual(){
+  const u=new URLSearchParams(location.search).get('prof');
+  if(PROFESIONALES[u]) return u;
+  // compatibilidad con los enlaces viejos que llevaban ?loc=
+  const l=new URLSearchParams(location.search).get('loc');
+  const porLoc={MB:'MN',G:'PV',M:'MS'};
+  return porLoc[l] || 'MN';
 }
-function cambiarLocalidad(){
-  const v=document.getElementById('localidad').value;
+function cambiarProfesional(){
+  const v=document.getElementById('profesional').value;
   const u=new URL(location.href);
-  u.searchParams.set('loc',v);
+  u.searchParams.set('prof',v);
+  u.searchParams.delete('loc');
   location.replace(u.toString());
 }
-const LOC=localidadActual();
+const PROF = profesionalActual();
+const LOC  = PROFESIONALES[PROF].loc;
 
 
 const val=id=>document.getElementById(id).value.trim();
@@ -984,7 +993,7 @@ async function hacerBusqueda(suf){
   const caja=document.getElementById('hallazgos'+suf);
   caja.innerHTML='<p class="sub">Buscando…</p>';
   try{
-    const d=await pedir({accion:'buscar',texto:val('buscar'+suf),localidad:LOC});
+    const d=await pedir({accion:'buscar',texto:val('buscar'+suf),localidad:LOC,profesional:PROF});
     if(!d.personas.length){
       caja.innerHTML='<div class="aviso neutro"><b>Sin coincidencias</b>'
         +'Las personas aparecen aquí después del primer encuentro, cuando se procesa '
@@ -1509,7 +1518,7 @@ async function gGuardarTodo(){
   btn.disabled=true; btn.textContent='Guardando…';
   try{
     const d=await pedir({accion:'guardarGrupo',codigo:GRUPO.codigo,momento:GMOMENTO,
-                         localidad:LOC,respuestas:JSON.stringify(lote)});
+                         localidad:LOC,profesional:PROF,respuestas:JSON.stringify(lote)});
     let html='<div class="aviso ok"><b>'+d.guardados+' guardadas</b>'
       +esc(d.nombres.slice(0,6).join(', '))+(d.nombres.length>6?' y otras…':'')+'</div>';
     if(d.saltados.length) html+='<div class="aviso neutro" style="margin-top:8px">'
@@ -1643,7 +1652,7 @@ async function cargarReporte(){
   }
 }
 
-document.getElementById('localidad').value=LOC;
+document.getElementById('profesional').value=PROF;
 cargarInfo();
 hacerBusqueda('');
 </script>

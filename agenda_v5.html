@@ -142,34 +142,15 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
     ya está tomado, el sistema te avisa y te propone los huecos libres más cercanos.</p>
 
 <div class="loc" id="cajaLoc">
-    <label for="localidad">Localidad</label>
-    <select id="localidad" onchange="cambiarLocalidad()">
-      <option value="MB">Manabí — Milton Naula</option>
-      <option value="G">Guayaquil — Paola Vallejo</option>
-      <option value="M">Milagro — Mariana Solís</option>
+    <label for="profesional">Profesional</label>
+    <select id="profesional" onchange="cambiarProfesional()">
+      <option value="MN">Milton Naula — Manabí</option>
+      <option value="PV">Paola Vallejo — Guayaquil</option>
+      <option value="PO">Paulina Ortega — Guayaquil</option>
+      <option value="MS">Mariana Solís — Milagro</option>
+      <option value="NR">Narcisa Rubio — Milagro</option>
     </select>
   </div>
-
-  <div class="modo" role="tablist">
-    <button role="tab" aria-selected="true"  onclick="verVista('nueva',this)">Agendar</button>
-    <button role="tab" aria-selected="false" onclick="verVista('lista',this)">Próximas</button>
-  </div>
-
-  <!-- ================= AGENDAR ================= -->
-  <div class="vista on" id="v-nueva">
-    <section class="paso">
-      <div class="paso-cabeza"><span class="paso-num">00</span><span class="paso-titulo">Dictar</span></div>
-      <div class="dictar" id="cajaDictar">
-        <p class="dic-tit">Dilo en voz alta y lo lleno por ti</p>
-        <p class="dic-ej">"Agéndame a Grace Lucas el martes a las tres de la tarde en
-          Manta, primera valoración."</p>
-        <div class="dic-reloj" id="dicReloj" hidden>00:00</div>
-        <button class="btn btn-dictar" id="btnDictar" onclick="alternarDictado()">
-          Dictar la cita
-        </button>
-        <div class="cargando" id="dicCargando">Escuchando lo que dijiste…</div>
-        <div id="dicSalida"></div>
-      </div>
     </section>
 
     <section class="paso">
@@ -280,27 +261,42 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 // ===========================================================================
 //  Pega aquí la MISMA URL /exec del Apps Script
 // ===========================================================================
-const URL_BACKEND = 'PEGA_AQUI_TU_URL_DE_APPS_SCRIPT';
+const URL_BACKEND = 'https://script.google.com/macros/s/AKfycbznImdt0wZkkJHl_xu5bWxjdhZAOS3Gyqbw1L086yO4MkGIDizfUBq4SfhdeJm0X1Lh/exec';
 
 let temporizador=null;
-// ---------------------------------------------------------- localidad
-// Se recuerda en el propio enlace, así cada persona guarda su acceso ya fijado.
-function localidadActual(){
-  const u=new URLSearchParams(location.search).get('loc');
-  return (u && ['MB','G','M'].indexOf(u)!==-1) ? u : 'MB';
+// ---------------------------------------------------------- profesional
+// Quién está usando el sistema. Viaja en el enlace (?prof=PV) para que cada
+// una guarde su acceso ya fijado. De aquí sale su localidad, su agenda y la
+// firma de sus documentos.
+const PROFESIONALES = {
+  MN:{nombre:'Milton Naula',   loc:'MB', localidad:'Manabí'},
+  PV:{nombre:'Paola Vallejo',  loc:'G',  localidad:'Guayaquil'},
+  PO:{nombre:'Paulina Ortega', loc:'G',  localidad:'Guayaquil'},
+  MS:{nombre:'Mariana Solís',  loc:'M',  localidad:'Milagro'},
+  NR:{nombre:'Narcisa Rubio',  loc:'M',  localidad:'Milagro'}
+};
+function profesionalActual(){
+  const u=new URLSearchParams(location.search).get('prof');
+  if(PROFESIONALES[u]) return u;
+  // compatibilidad con los enlaces viejos que llevaban ?loc=
+  const l=new URLSearchParams(location.search).get('loc');
+  const porLoc={MB:'MN',G:'PV',M:'MS'};
+  return porLoc[l] || 'MN';
 }
-function cambiarLocalidad(){
-  const v=document.getElementById('localidad').value;
+function cambiarProfesional(){
+  const v=document.getElementById('profesional').value;
   const u=new URL(location.href);
-  u.searchParams.set('loc',v);
+  u.searchParams.set('prof',v);
+  u.searchParams.delete('loc');
   location.replace(u.toString());
 }
-const LOC=localidadActual();
+const PROF = profesionalActual();
+const LOC  = PROFESIONALES[PROF].loc;
 // ?solo=1 → enlace para quien solo agenda: sin acceso al resto del sistema
 if(new URLSearchParams(location.search).get('solo')==='1'){
   document.querySelectorAll('a[href^="index.html"]').forEach(a=>a.remove());
 }
-document.getElementById('localidad').value=LOC;
+document.getElementById('profesional').value=PROF;
 
 const val=id=>document.getElementById(id).value.trim();
 const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -346,7 +342,7 @@ async function cambiarFecha(){
   const res=document.getElementById('resumenDispo');
   if(!val('fecha')){ caja.innerHTML=''; return; }
   try{
-    const d=await pedir({accion:'agendaDia',profesional:LOC,fecha:val('fecha')});
+    const d=await pedir({accion:'agendaDia',profesional:PROF,fecha:val('fecha')});
     if(d.resumen){ res.textContent=d.resumen; res.hidden=false; }
     if(!d.disponibilidad){
       caja.innerHTML='<div class="dispo vacio">Ese día no tiene un lugar fijo asignado. '
@@ -531,7 +527,7 @@ async function guardar(forzar){
       cuando:val('fecha')+'T'+val('hora'),
       duracion:val('duracion'), modalidad:val('modalidad'),
       lugar:val('lugar'), motivo:val('motivo'),
-      atencion:val('atencion'), profesional:LOC, localidad:LOC,
+      atencion:val('atencion'), profesional:PROF, localidad:LOC,
       forzar: forzar ? 'si' : ''
     });
     document.getElementById('cargando').classList.remove('on');

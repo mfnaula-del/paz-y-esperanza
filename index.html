@@ -78,11 +78,13 @@ h1{font-size:26px;font-weight:600;letter-spacing:-.025em;line-height:1.1;margin-
   </div>
 
   <div class="loc" id="cajaLoc">
-    <label for="localidad">Localidad</label>
-    <select id="localidad" onchange="cambiarLocalidad()">
-      <option value="MB">Manabí — Milton Naula</option>
-      <option value="G">Guayaquil — Paola Vallejo</option>
-      <option value="M">Milagro — Mariana Solís</option>
+    <label for="profesional">Profesional</label>
+    <select id="profesional" onchange="cambiarProfesional()">
+      <option value="MN">Milton Naula — Manabí</option>
+      <option value="PV">Paola Vallejo — Guayaquil</option>
+      <option value="PO">Paulina Ortega — Guayaquil</option>
+      <option value="MS">Mariana Solís — Milagro</option>
+      <option value="NR">Narcisa Rubio — Milagro</option>
     </select>
   </div>
 
@@ -128,19 +130,34 @@ h1{font-size:26px;font-weight:600;letter-spacing:-.025em;line-height:1.1;margin-
 const URL_BACKEND = 'https://script.google.com/macros/s/AKfycbznImdt0wZkkJHl_xu5bWxjdhZAOS3Gyqbw1L086yO4MkGIDizfUBq4SfhdeJm0X1Lh/exec';
 
 
-// ---------------------------------------------------------- localidad
-// Se recuerda en el propio enlace, así cada persona guarda su acceso ya fijado.
-function localidadActual(){
-  const u=new URLSearchParams(location.search).get('loc');
-  return (u && ['MB','G','M'].indexOf(u)!==-1) ? u : 'MB';
+// ---------------------------------------------------------- profesional
+// Quién está usando el sistema. Viaja en el enlace (?prof=PV) para que cada
+// una guarde su acceso ya fijado. De aquí sale su localidad, su agenda y la
+// firma de sus documentos.
+const PROFESIONALES = {
+  MN:{nombre:'Milton Naula',   loc:'MB', localidad:'Manabí'},
+  PV:{nombre:'Paola Vallejo',  loc:'G',  localidad:'Guayaquil'},
+  PO:{nombre:'Paulina Ortega', loc:'G',  localidad:'Guayaquil'},
+  MS:{nombre:'Mariana Solís',  loc:'M',  localidad:'Milagro'},
+  NR:{nombre:'Narcisa Rubio',  loc:'M',  localidad:'Milagro'}
+};
+function profesionalActual(){
+  const u=new URLSearchParams(location.search).get('prof');
+  if(PROFESIONALES[u]) return u;
+  // compatibilidad con los enlaces viejos que llevaban ?loc=
+  const l=new URLSearchParams(location.search).get('loc');
+  const porLoc={MB:'MN',G:'PV',M:'MS'};
+  return porLoc[l] || 'MN';
 }
-function cambiarLocalidad(){
-  const v=document.getElementById('localidad').value;
+function cambiarProfesional(){
+  const v=document.getElementById('profesional').value;
   const u=new URL(location.href);
-  u.searchParams.set('loc',v);
+  u.searchParams.set('prof',v);
+  u.searchParams.delete('loc');
   location.replace(u.toString());
 }
-const LOC=localidadActual();
+const PROF = profesionalActual();
+const LOC  = PROFESIONALES[PROF].loc;
 
 
 const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -153,10 +170,10 @@ const n=new Date();
 document.getElementById('hoy').textContent =
   DIAS[n.getDay()]+' '+n.getDate()+' de '+MESES[n.getMonth()]+' de '+n.getFullYear();
 
-document.getElementById('localidad').value=LOC;
+document.getElementById('profesional').value=PROF;
 // los enlaces conservan la localidad elegida
 document.querySelectorAll('.tarjeta').forEach(a=>{
-  a.href=a.getAttribute('href')+'?loc='+LOC;
+  a.href=a.getAttribute('href')+'?prof='+PROF;
 });
 
 async function pedir(datos){
@@ -190,7 +207,7 @@ async function comprobar(){
 async function proxima(){
   const caja=document.getElementById('proxima');
   try{
-    const d=await pedir({accion:'agendaListar',filtro:'',dias:'60',localidad:LOC});
+    const d=await pedir({accion:'agendaListar',filtro:'',dias:'60',profesional:PROF});
     const pend=d.citas.filter(c=>c.estado==='Agendada');
 
     const globo=document.getElementById('globoCitas');
