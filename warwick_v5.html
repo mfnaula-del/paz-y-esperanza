@@ -198,6 +198,21 @@ table.of td.c{text-align:center;width:11%}
   padding:14px;font-size:14px;color:var(--oliva);cursor:pointer;background:#FBFBFA}
 .subir-esc:hover{border-color:var(--oliva)}
 .subir-esc input{display:none}
+.chip-claro{background:#EDF1EC;border:1px solid var(--linea);color:var(--oliva)}
+.chip-claro[aria-pressed="true"]{background:var(--oliva);border-color:var(--oliva);color:#fff}
+.lote{border:1px solid var(--linea);border-radius:10px;background:#FBFBFA;margin-top:8px;overflow:hidden}
+.lote.lista{border-color:var(--oliva)}
+.lote.duda{border-color:var(--ambar)}
+.lote-cab{display:flex;align-items:center;gap:10px;padding:11px 12px;cursor:pointer;
+  background:none;border:0;width:100%;text-align:left;font-family:inherit;color:inherit}
+.lote .nom{flex:1;min-width:0}
+.lote .nom b{font-size:14.5px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lote .nom span{font-size:11.5px;color:var(--apagado)}
+.lote .pts{font-family:var(--mono);font-size:13px;font-weight:700;white-space:nowrap}
+.lote .pts.ok{color:var(--oliva)} .lote .pts.falta{color:var(--ambar)}
+.lote-items{padding:0 12px 12px;border-top:1px solid var(--linea);background:#fff}
+.lote-items[hidden]{display:none}
+.lote select{font-size:13px;padding:7px;margin-top:6px}
 
 .nota-metodo{margin-top:16px;padding:9px 11px;border-left:2px solid #9aa5b1;background:#F6F7F9;
   font-size:9.5px;line-height:1.5;color:#555;border-radius:0 4px 4px 0}
@@ -266,6 +281,29 @@ table.of td.c{text-align:center;width:11%}
 
   <!-- ================= APLICAR ================= -->
   <div class="vista on" id="v-aplicar">
+
+    <section class="paso no-imprimir" id="secCarga">
+      <div class="paso-cabeza"><span class="paso-num">00</span><span class="paso-titulo">Cargar en lote</span></div>
+      <div class="carta">
+        <p class="ayuda" style="margin-bottom:11px">¿Ya aplicaste el Warwick en papel?
+          Sube los escaneos y el sistema los lee y los reparte solo, sin marcar uno por uno.</p>
+        <div class="auto" style="margin-bottom:10px">
+          <span class="chip-lbl" style="color:var(--oliva)">Momento</span>
+          <button class="chip chip-claro" id="chipPre"  aria-pressed="true"
+                  onclick="lPonerMomento('pre')">Pre-test</button>
+          <button class="chip chip-claro" id="chipPost" aria-pressed="false"
+                  onclick="lPonerMomento('post')">Post-test</button>
+        </div>
+        <label class="subir-esc">
+          Subir Warwick escaneados
+          <input type="file" id="lEscaneos" accept="image/*,application/pdf" multiple
+                 onchange="lLeerEscaneos(this)">
+        </label>
+        <div class="cargando" id="lCargando"></div>
+        <div id="lSalida"></div>
+      </div>
+    </section>
+
     <section class="paso" id="secBuscar">
       <div class="paso-cabeza"><span class="paso-num">01</span><span class="paso-titulo">Participante</span></div>
       <div class="carta">
@@ -1030,6 +1068,140 @@ async function hacerBusqueda(suf){
     caja.innerHTML='<div class="aviso error"><b>No se pudo buscar</b>'+esc(e.message)+'</div>';
   }
 }
+
+
+// ============================================================================
+//  CARGA EN LOTE  ·  Warwick individuales aplicados en papel
+// ============================================================================
+let LMOMENTO='pre', LHOJAS=[], LCAND=[];
+
+function lPonerMomento(v){
+  LMOMENTO=v;
+  document.getElementById('chipPre').setAttribute('aria-pressed', v==='pre');
+  document.getElementById('chipPost').setAttribute('aria-pressed', v==='post');
+}
+
+async function lLeerEscaneos(input){
+  const files=[...input.files]; input.value='';
+  if(!files.length) return;
+  const cg=document.getElementById('lCargando');
+  cg.classList.add('on');
+  cg.textContent='Leyendo '+files.length+' hoja(s)… puede tardar un minuto.';
+  document.getElementById('lSalida').innerHTML='';
+  try{
+    const cuerpo=new URLSearchParams();
+    cuerpo.append('accion','leerEscaneos');
+    cuerpo.append('localidad',LOC);
+    cuerpo.append('momento',LMOMENTO);
+    for(const f of files){
+      const a = f.type==='application/pdf' ? await gLeerPdf(f) : await gComprimir(f);
+      cuerpo.append('adjunto',a.b64);
+      cuerpo.append('adjuntoMime',a.mime);
+    }
+    const r=await fetch(URL_BACKEND,{method:'POST',body:cuerpo});
+    const d=await r.json();
+    cg.classList.remove('on');
+    if(!d.exito) throw new Error(d.error||'error');
+    LCAND=d.candidatos||[];
+    LHOJAS=d.hojas.map(h=>({...h, resp:h.respuestas.map(v=>(v>=1&&v<=5)?v:null), abierto:false}));
+    lDibujar(d);
+  }catch(e){
+    cg.classList.remove('on');
+    document.getElementById('lSalida').innerHTML=
+      '<div class="aviso error"><b>No se pudo leer</b>'+esc(e.message)+'</div>';
+  }
+}
+
+function lDibujar(d){
+  if(!LHOJAS.length){
+    document.getElementById('lSalida').innerHTML=
+      '<div class="aviso neutro"><b>No reconocí ninguna hoja</b>'
+      +'Revisa que las fotos se vean derechas y con buena luz.</div>';
+    return;
+  }
+  const opciones = ['<option value="">— asignar a —</option>']
+    .concat(LCAND.map(n=>'<option value="'+esc(n)+'">'+esc(n)+'</option>')).join('');
+
+  const filas = LHOJAS.map((h,i)=>{
+    const n=h.resp.filter(x=>x!==null).length;
+    const total=h.resp.reduce((a,b)=>a+(b||0),0);
+    const listo=n===7 && h.nombre;
+    const cls = listo?'lista':(h.nombre?'duda':'duda');
+    return '<div class="lote '+cls+'">'
+      + '<button class="lote-cab" onclick="lAbrir('+i+')">'
+      +   '<span class="nom"><b>'+esc(h.nombre||'Sin asignar')+'</b>'
+      +     '<span>'+(h.leido?'leí: '+esc(h.leido):'nombre ilegible')
+      +     (h.nombre&&!h.seguro?' · por parecido':'')+'</span></span>'
+      +   '<span class="pts '+(listo?'ok':'falta')+'">'+(n===7?total+'/35':n+'/7')+'</span>'
+      + '</button>'
+      + '<div class="lote-items" '+(h.abierto?'':'hidden')+'>'
+      +   (h.nombre?'':'<select onchange="lAsignar('+i+',this.value)">'+opciones+'</select>')
+      +   INFO.items.map((t,j)=>
+          '<div class="fila-item"><p><i>'+(j+1)+'</i>'+esc(t)+'</p><div class="mini">'
+          + INFO.niveles.map((nv,k)=>'<button type="button" aria-pressed="'+(h.resp[j]===k+1)+'" '
+              +'onclick="lMarcar('+i+','+j+','+(k+1)+')">'+(k+1)+'</button>').join('')
+          +'</div></div>').join('')
+      + '</div></div>';
+  }).join('');
+
+  const listos=LHOJAS.filter(h=>h.nombre && h.resp.every(x=>x!==null)).length;
+  let avisos='';
+  if(d && d.sin_emparejar) avisos+='<div class="aviso neutro" style="margin-top:10px">'
+    +'<b>'+d.sin_emparejar+' hoja(s) sin dueño</b>Ábrelas y elige a quién corresponden.</div>';
+  if(d && d.incompletas) avisos+='<div class="aviso neutro" style="margin-top:8px">'
+    +'<b>'+d.incompletas+' con filas sin marca clara</b>Las dejé en blanco a propósito: '
+    +'es preferible que las completes tú a que el sistema adivine.</div>';
+
+  document.getElementById('lSalida').innerHTML =
+      '<p class="ayuda" style="margin-top:12px">Revisa antes de guardar. '
+    + 'Toca un nombre para ver o corregir sus respuestas.</p>'
+    + filas + avisos
+    + '<button class="btn btn-enviar" id="lGuardar" onclick="lGuardar()"'
+    + (listos?'':' disabled')+'>'
+    + (listos?'Guardar '+listos+' de '+LHOJAS.length:'Completa al menos una')+'</button>';
+}
+
+function lAbrir(i){ LHOJAS[i].abierto=!LHOJAS[i].abierto; lDibujar(); }
+function lMarcar(i,j,v){ LHOJAS[i].resp[j]=v; LHOJAS[i].abierto=true; lDibujar(); }
+function lAsignar(i,nombre){
+  LHOJAS[i].nombre=nombre;
+  LHOJAS[i].codigo='';   // se resuelve al guardar
+  lDibujar();
+}
+
+async function lGuardar(){
+  const lote=LHOJAS.filter(h=>h.nombre && h.resp.every(x=>x!==null))
+    .map(h=>({codigo:h.codigo, nombre:h.nombre, edad:h.edad, respuestas:h.resp}));
+  if(!lote.length) return;
+
+  // los que se asignaron a mano no traen código: se busca
+  for(const x of lote){
+    if(x.codigo) continue;
+    try{
+      const d=await pedir({accion:'buscar',texto:x.nombre,localidad:LOC,profesional:PROF});
+      if(d.personas.length) x.codigo=d.personas[0].codigo;
+    }catch(e){}
+  }
+
+  const btn=document.getElementById('lGuardar');
+  btn.disabled=true; btn.textContent='Guardando…';
+  try{
+    const d=await pedir({accion:'guardarLote',momento:LMOMENTO,profesional:PROF,
+                         respuestas:JSON.stringify(lote)});
+    let html='<div class="aviso ok"><b>'+d.guardados+' guardadas</b>'
+      +esc(d.nombres.slice(0,8).join(', '))+(d.nombres.length>8?' y otras…':'')+'</div>';
+    if(d.saltados.length) html+='<div class="aviso neutro" style="margin-top:8px">'
+      +'<b>'+d.saltados.length+' quedaron fuera</b>'+esc(d.saltados.join(' · '))+'</div>';
+    document.getElementById('lSalida').innerHTML=html
+      +'<button class="btn btn-suave" onclick="lLimpiar()">Cargar otro lote</button>';
+    LHOJAS=[];
+  }catch(e){
+    document.getElementById('lSalida').innerHTML=
+      '<div class="aviso error"><b>No se pudo guardar</b>'+esc(e.message)+'</div>';
+  }
+}
+
+function lLimpiar(){ LHOJAS=[]; document.getElementById('lSalida').innerHTML=''; }
 
 // ---------------------------------------------------------- elegir
 function elegir(i){
