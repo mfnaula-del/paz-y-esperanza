@@ -230,6 +230,36 @@ body.grabando .subir{background:#1B2027;border-color:#39414B;color:#9AA6B2}
 // ===========================================================================
 const URL_BACKEND = 'https://script.google.com/macros/s/AKfycbznImdt0wZkkJHl_xu5bWxjdhZAOS3Gyqbw1L086yO4MkGIDizfUBq4SfhdeJm0X1Lh/exec';
 
+
+// ---------------------------------------------------------- profesional
+// Quién está usando el sistema. Viaja en el enlace (?prof=PV) para que cada
+// una guarde su acceso ya fijado. De aquí sale su localidad, su agenda y la
+// firma de sus documentos.
+const PROFESIONALES = {
+  MN:{nombre:'Milton Naula',   loc:'MB', localidad:'Manabí'},
+  PV:{nombre:'Paola Vallejo',  loc:'G',  localidad:'Guayaquil'},
+  PO:{nombre:'Paulina Ortega', loc:'G',  localidad:'Guayaquil'},
+  MS:{nombre:'Mariana Solís',  loc:'M',  localidad:'Milagro'},
+  NR:{nombre:'Narcisa Rubio',  loc:'M',  localidad:'Milagro'}
+};
+function profesionalActual(){
+  const u=new URLSearchParams(location.search).get('prof');
+  if(PROFESIONALES[u]) return u;
+  // compatibilidad con los enlaces viejos que llevaban ?loc=
+  const l=new URLSearchParams(location.search).get('loc');
+  const porLoc={MB:'MN',G:'PV',M:'MS'};
+  return porLoc[l] || 'MN';
+}
+function cambiarProfesional(){
+  const v=document.getElementById('profesional').value;
+  const u=new URL(location.href);
+  u.searchParams.set('prof',v);
+  u.searchParams.delete('loc');
+  location.replace(u.toString());
+}
+const PROF = profesionalActual();
+const LOC  = PROFESIONALES[PROF].loc;
+
 const MAX_SEG=360, HZ=16000;
 
 // Los cantones solo se usan en Manabí: en Guayaquil y Milagro la ciudad ya es el cantón.
@@ -649,6 +679,8 @@ function decir(clase,titulo,texto){
   if(lista.length===1) sel.value=lista[0][0];
   pintarCodigo();
 })();
+
+document.getElementById('profesional').value=PROF;
 
 // cantones solo en Manabí
 (function(){
