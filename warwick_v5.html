@@ -1357,6 +1357,10 @@ function hojaOficial(d,momento){
   + '<table class="of"><tbody>'
   +  '<tr><td class="et">Nombre y apellido:</td><td>'+esc(d.nombre)+'</td>'
   +      '<td class="et">Código ID:</td><td style="font-family:var(--mono);font-size:9px">'+esc(d.codigo)+'</td></tr>'
+  +  (d.cedula
+      ? '<tr><td class="et">Documento de identidad:</td><td>'+esc(d.cedula)+'</td>'
+        +'<td class="et">Modalidad:</td><td>'+(d.grupal?'Terapia grupal':'Terapia individual')+'</td></tr>'
+      : '')
   +  '<tr><td class="et">Fecha de aplicación:</td><td>'+esc(r.fecha)+'</td>'
   +      '<td class="et">Momento:</td><td>'+cb(momento==='pre')+' Pre-test &nbsp; '
   +        cb(momento==='post')+' Post-test</td></tr>'
