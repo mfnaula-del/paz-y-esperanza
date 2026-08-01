@@ -151,6 +151,28 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
       <option value="NR">Narcisa Rubio — Milagro</option>
     </select>
   </div>
+
+  <div class="modo" role="tablist">
+    <button role="tab" aria-selected="true"  onclick="verVista('nueva',this)">Agendar</button>
+    <button role="tab" aria-selected="false" onclick="verVista('lista',this)">Próximas</button>
+  </div>
+
+  <!-- ================= AGENDAR ================= -->
+  <div class="vista on" id="v-nueva">
+
+    <section class="paso">
+      <div class="paso-cabeza"><span class="paso-num">00</span><span class="paso-titulo">Dictar</span></div>
+      <div class="dictar" id="cajaDictar">
+        <p class="dic-tit">Dilo en voz alta y lo lleno por ti</p>
+        <p class="dic-ej">"Agéndame a Grace Lucas el martes a las tres de la tarde en
+          Manta, primera valoración."</p>
+        <div class="dic-reloj" id="dicReloj" hidden>00:00</div>
+        <button class="btn btn-dictar" id="btnDictar" onclick="alternarDictado()">
+          Dictar la cita
+        </button>
+        <div class="cargando" id="dicCargando">Escuchando lo que dijiste…</div>
+        <div id="dicSalida"></div>
+      </div>
     </section>
 
     <section class="paso">

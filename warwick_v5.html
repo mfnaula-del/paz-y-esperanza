@@ -243,8 +243,8 @@ table.of td.c{text-align:center;width:11%}
     <h1>Escala Warwick</h1>
     <p class="sub">Busca a la persona por su nombre. Lo demás sale solo.</p>
     <p class="regla">Se aplica únicamente en <b>terapia individual</b> y desde los
-      <b>17 años</b>. En terapia grupal el código es del grupo, así que sus participantes
-      no aparecen aquí.</p>
+      <b>17 años</b>. En terapia grupal el código es del grupo entero, así que cada
+      participante se identifica por su nombre: usa la pestaña <b>Grupal</b>.</p>
 
 <div class="loc" id="cajaLoc">
     <label for="profesional">Profesional</label>
@@ -256,6 +256,13 @@ table.of td.c{text-align:center;width:11%}
       <option value="NR">Narcisa Rubio — Milagro</option>
     </select>
   </div>
+
+    <div class="modo" role="tablist">
+      <button role="tab" aria-selected="true"  onclick="verVista('aplicar',this)">Individual</button>
+      <button role="tab" aria-selected="false" onclick="verVista('grupal',this)">Grupal</button>
+      <button role="tab" aria-selected="false" onclick="verVista('ficha',this)">Ficha</button>
+      <button role="tab" aria-selected="false" onclick="verVista('reporte',this)">Reporte</button>
+    </div>
 
   <!-- ================= APLICAR ================= -->
   <div class="vista on" id="v-aplicar">
