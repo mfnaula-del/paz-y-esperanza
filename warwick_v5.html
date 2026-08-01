@@ -213,6 +213,11 @@ table.of td.c{text-align:center;width:11%}
 .lote-items{padding:0 12px 12px;border-top:1px solid var(--linea);background:#fff}
 .lote-items[hidden]{display:none}
 .lote select{font-size:13px;padding:7px;margin-top:6px}
+.fecha-hoja{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:10px 0 4px}
+.fecha-hoja label{font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--oliva);margin:0}
+.fecha-hoja input{width:auto;font-size:14px;padding:7px 9px}
+.aviso-fecha{font-size:11.5px;color:var(--ambar)}
 
 .nota-metodo{margin-top:16px;padding:9px 11px;border-left:2px solid #9aa5b1;background:#F6F7F9;
   font-size:9.5px;line-height:1.5;color:#555;border-radius:0 4px 4px 0}
@@ -1112,7 +1117,8 @@ async function lLeerEscaneos(input){
     cg.classList.remove('on');
     if(!d.exito) throw new Error(d.error||'error');
     LCAND=d.candidatos||[];
-    LHOJAS=d.hojas.map(h=>({...h, resp:h.respuestas.map(v=>(v>=1&&v<=5)?v:null), abierto:false}));
+    LHOJAS=d.hojas.map(h=>({...h, resp:h.respuestas.map(v=>(v>=1&&v<=5)?v:null),
+                            fecha:h.fecha||'', abierto:false}));
     lDibujar(d);
   }catch(e){
     cg.classList.remove('on');
@@ -1140,11 +1146,18 @@ function lDibujar(d){
       + '<button class="lote-cab" onclick="lAbrir('+i+')">'
       +   '<span class="nom"><b>'+esc(h.nombre||'Sin asignar')+'</b>'
       +     '<span>'+(h.leido?'leí: '+esc(h.leido):'nombre ilegible')
-      +     (h.nombre&&!h.seguro?' · por parecido':'')+'</span></span>'
+      +     (h.nombre&&!h.seguro?' · por parecido':'')
+      +     (h.fecha?' · '+esc(h.fecha.split('-').reverse().join('/')):' · sin fecha')
+      +     '</span></span>'
       +   '<span class="pts '+(listo?'ok':'falta')+'">'+(n===7?total+'/35':n+'/7')+'</span>'
       + '</button>'
       + '<div class="lote-items" '+(h.abierto?'':'hidden')+'>'
       +   (h.nombre?'':'<select onchange="lAsignar('+i+',this.value)">'+opciones+'</select>')
+      +   '<div class="fecha-hoja"><label>Fecha de aplicación</label>'
+      +     '<input type="date" value="'+esc(h.fecha||'')+'" '
+      +       'onchange="lFecha('+i+',this.value)">'
+      +     (h.fecha?'':'<span class="aviso-fecha">no se pudo leer del papel</span>')
+      +   '</div>'
       +   INFO.items.map((t,j)=>
           '<div class="fila-item"><p><i>'+(j+1)+'</i>'+esc(t)+'</p><div class="mini">'
           + INFO.niveles.map((nv,k)=>'<button type="button" aria-pressed="'+(h.resp[j]===k+1)+'" '
@@ -1160,6 +1173,9 @@ function lDibujar(d){
   if(d && d.incompletas) avisos+='<div class="aviso neutro" style="margin-top:8px">'
     +'<b>'+d.incompletas+' con filas sin marca clara</b>Las dejé en blanco a propósito: '
     +'es preferible que las completes tú a que el sistema adivine.</div>';
+  if(d && d.sin_fecha) avisos+='<div class="aviso neutro" style="margin-top:8px">'
+    +'<b>'+d.sin_fecha+' sin fecha legible</b>Ponla a mano: si la dejas vacía se guardará '
+    +'con la fecha de hoy, y eso desalinea el seguimiento.</div>';
 
   document.getElementById('lSalida').innerHTML =
       '<p class="ayuda" style="margin-top:12px">Revisa antes de guardar. '
@@ -1172,6 +1188,8 @@ function lDibujar(d){
 
 function lAbrir(i){ LHOJAS[i].abierto=!LHOJAS[i].abierto; lDibujar(); }
 function lMarcar(i,j,v){ LHOJAS[i].resp[j]=v; LHOJAS[i].abierto=true; lDibujar(); }
+function lFecha(i,v){ LHOJAS[i].fecha=v; LHOJAS[i].abierto=true; lDibujar(); }
+
 function lAsignar(i,nombre){
   LHOJAS[i].nombre=nombre;
   LHOJAS[i].codigo='';   // se resuelve al guardar
@@ -1180,7 +1198,8 @@ function lAsignar(i,nombre){
 
 async function lGuardar(){
   const lote=LHOJAS.filter(h=>h.nombre && h.resp.every(x=>x!==null))
-    .map(h=>({codigo:h.codigo, nombre:h.nombre, edad:h.edad, respuestas:h.resp}));
+    .map(h=>({codigo:h.codigo, nombre:h.nombre, edad:h.edad,
+              fecha:h.fecha||'', respuestas:h.resp}));
   if(!lote.length) return;
 
   // los que se asignaron a mano no traen código: se busca
@@ -1581,6 +1600,10 @@ function gDibujarParticipantes(){
       +   '<span class="marca '+(listo?'ok':'falta')+'">'+(listo?total+'/35':n+'/7')+'</span>'
       + '</button>'
       + '<div class="pgrupo-items" '+(p.abierto?'':'hidden')+'>'
+      +   '<div class="fecha-hoja"><label>Fecha de aplicación</label>'
+      +     '<input type="date" value="'+esc(p.fecha||'')+'" '
+      +       'onchange="gFecha('+i+',this.value)">'
+      +     (p.fecha?'':'<span class="aviso-fecha">se usará la de hoy</span>')+'</div>'
       +   d.items.map((t,j)=>
           '<div class="fila-item"><p><i>'+(j+1)+'</i>'+esc(t)+'</p><div class="mini">'
           + d.niveles.map((nv,k)=>'<button type="button" aria-pressed="'+(p.resp[j]===k+1)+'" '
@@ -1606,6 +1629,7 @@ function gDibujarParticipantes(){
 }
 
 function gAbrir(i){ GPART[i].abierto=!GPART[i].abierto; gDibujarParticipantes(); }
+function gFecha(i,v){ GPART[i].fecha=v; GPART[i].abierto=true; gDibujarParticipantes(); }
 function gMarcar(i,j,v){
   GPART[i].resp[j]=v;
   GPART[i].dudas=GPART[i].dudas.filter(x=>x!==j+1);
@@ -1652,6 +1676,7 @@ function gAplicarLectura(d){
     const i=GPART.findIndex(p=>p.nombre===hoja.nombre);
     if(i===-1){ huerfanas.push(hoja); return; }
     GPART[i].resp = hoja.respuestas.map(v=> (v>=1&&v<=5)?v:null);
+    GPART[i].fecha = hoja.fecha || '';
     GPART[i].dudas = (hoja.dudas||[]).concat(
       hoja.respuestas.map((v,j)=>(v>=1&&v<=5)?null:j+1).filter(x=>x));
     GPART[i].abierto = GPART[i].dudas.length>0;
@@ -1703,7 +1728,7 @@ function gLeerPdf(f){
 async function gGuardarTodo(){
   const lote=GPART.filter(p=>p.aplica && p.resp.every(x=>x!==null))
     .map(p=>({nombre:p.nombre, edad:p.edad, genero:p.genero, vbg:p.vbg,
-              discapacidad:p.discapacidad, respuestas:p.resp}));
+              discapacidad:p.discapacidad, fecha:p.fecha||'', respuestas:p.resp}));
   if(!lote.length) return;
 
   const btn=document.getElementById('gGuardar');
