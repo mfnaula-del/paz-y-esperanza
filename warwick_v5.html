@@ -1011,6 +1011,15 @@ const val=id=>document.getElementById(id).value.trim();
 const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const cb=on=>'<span class="cb">'+(on?'☒':'☐')+'</span>';
 
+// La trazabilidad guarda MUJER / HOMBRE; el formulario oficial dice
+// Femenino / Masculino. Estas dos funciones traducen entre ambos.
+const esMujer  = g => /^\s*(mujer|femenin\w*|fem|f)\s*$/i.test(String(g||''));
+const esHombre = g => /^\s*(hombre|masculin\w*|var[oó]n|masc|m)\s*$/i.test(String(g||''));
+// Sí / No: en blanco NO se marca nada, para no afirmar algo que nadie registró.
+// Aguanta "SI", "Sí", "S" y también "SI - Psicológica", que trae el tipo pegado.
+const esSi = v => /^\s*(s[ií]|s|1|x|verdadero|true)\b/i.test(String(v||''));
+const esNo = v => /^\s*(no|n|0|falso|false)\b/i.test(String(v||''));
+
 function verVista(v,btn){
   document.querySelectorAll('.vista').forEach(e=>e.classList.remove('on'));
   document.getElementById('v-'+v).classList.add('on');
@@ -1366,12 +1375,12 @@ function hojaOficial(d,momento){
   +        cb(momento==='post')+' Post-test</td></tr>'
   +  '<tr><td class="et">Edad:</td><td>'+esc(d.edad)+'</td>'
   +      '<td class="et">Género:</td><td>'
-  +        cb(/femen/i.test(d.genero))+' Femenino &nbsp; '+cb(/mascul/i.test(d.genero))+' Masculino<br>'
-  +        cb(!!d.genero && !/femen|mascul/i.test(d.genero))+' Otro</td></tr>'
-  +  '<tr><td class="et">¿Víctima de VBG?:</td><td>'+cb(/^s/i.test(d.vbg))+' Sí &nbsp; '
-  +        cb(/^n/i.test(d.vbg))+' No</td>'
-  +      '<td class="et">¿Discapacidad?:</td><td>'+cb(/^s/i.test(d.discapacidad))+' Sí &nbsp; '
-  +        cb(/^n/i.test(d.discapacidad)||d.discapacidad==='')+' No</td></tr>'
+  +        cb(esMujer(d.genero))+' Femenino &nbsp; '+cb(esHombre(d.genero))+' Masculino<br>'
+  +        cb(!!d.genero && !esMujer(d.genero) && !esHombre(d.genero))+' Otro</td></tr>'
+  +  '<tr><td class="et">¿Víctima de VBG?:</td><td>'+cb(esSi(d.vbg))+' Sí &nbsp; '
+  +        cb(esNo(d.vbg))+' No</td>'
+  +      '<td class="et">¿Discapacidad?:</td><td>'+cb(esSi(d.discapacidad))+' Sí &nbsp; '
+  +        cb(esNo(d.discapacidad))+' No</td></tr>'
   + '</tbody></table>'
 
   + '<h3>INSTRUCCIONES</h3><p>'+esc(d.consigna)+'</p>'
