@@ -82,6 +82,9 @@ body.grabando .codigo.listo{background:var(--oliva);color:#fff}
 @keyframes latir{50%{opacity:.25}}
 audio{width:100%;margin-top:12px}
 
+.btn-mini{background:var(--oliva);color:#fff;border:0;border-radius:6px;padding:3px 9px;
+  font-family:inherit;font-size:11px;font-weight:600;cursor:pointer;margin-left:3px}
+.btn-mini + .btn-mini{background:transparent;color:var(--oliva);border:1px solid var(--linea)}
 .adjuntos{display:flex;flex-direction:column;gap:7px;margin-top:11px}
 .adj{display:flex;align-items:center;gap:10px;background:#FBFBFA;border:1px solid var(--linea);
   border-radius:9px;padding:10px 12px}
@@ -136,6 +139,37 @@ body.grabando .subir{background:#1B2027;border-color:#39414B;color:#9AA6B2}
       <option value="NR">Narcisa Rubio — Milagro</option>
     </select>
   </div>
+
+  <div class="modo" role="tablist">
+    <button role="tab" aria-selected="true"  onclick="ponerModo('TI',this)">Individual</button>
+    <button role="tab" aria-selected="false" onclick="ponerModo('TG',this)">Grupal</button>
+  </div>
+  <p class="explica" id="explica"></p>
+
+  <section class="paso">
+    <div class="paso-cabeza"><span class="paso-num">01</span><span class="paso-titulo">Identificar</span></div>
+    <div class="carta">
+      <div class="rejilla">
+        <div class="campo ancho" id="cajaCanton" hidden>
+          <label for="canton">Cantón</label>
+          <select id="canton" onchange="pintarCodigo()"></select>
+        </div>
+        <div class="campo ancho">
+          <label for="lugar">Lugar de intervención</label>
+          <input id="lugar" list="lugares" placeholder="Escribe la comunidad o barrio"
+                 autocomplete="off" oninput="lugarDebounce()">
+          <datalist id="lugares"></datalist>
+          <p class="limite" id="estadoLugar"></p>
+        </div>
+        <div class="campo">
+          <label for="num" id="lblNum">N° de paciente</label>
+          <input id="num" type="number" inputmode="numeric" min="1" placeholder="1" oninput="pintarCodigo()">
+        </div>
+        <div class="campo">
+          <label for="sesion">N° de sesión</label>
+          <input id="sesion" type="number" inputmode="numeric" min="1" value="1">
+        </div>
+      </div>
       <div class="codigo" id="codigo">Completa los campos para generar el código</div>
     </div>
   </section>
@@ -196,22 +230,16 @@ body.grabando .subir{background:#1B2027;border-color:#39414B;color:#9AA6B2}
 // ===========================================================================
 const URL_BACKEND = 'https://script.google.com/macros/s/AKfycbznImdt0wZkkJHl_xu5bWxjdhZAOS3Gyqbw1L086yO4MkGIDizfUBq4SfhdeJm0X1Lh/exec';
 
-const PROYECTO='K-COL-2025-9005', INDICADOR='R1A6', ANIO='2025';
 const MAX_SEG=360, HZ=16000;
 
-// Cantones de cada localidad: el desplegable solo muestra los que corresponden.
-const CANTONES={
-  MB:[['MT','Manta'],['PT','Portoviejo'],['J','Jaramijó'],['MC','Montecristi']],
-  G :[['G','Guayaquil']],
-  M :[['M','Milagro']]
-};
+// Los cantones solo se usan en Manabí: en Guayaquil y Milagro la ciudad ya es el cantón.
+const CANTONES_MB = [['MT','Manta'],['PT','Portoviejo'],['J','Jaramijó'],['MC','Montecristi']];
 
 const TEXTOS={
   TI:'Genera la Ficha Integrada de Atención de Salud Mental. Si la persona tiene 17 años '
     +'o más, después queda habilitada para la escala Warwick.',
-  TG:'Genera solo el Informe de Terapias Grupales. El código es del grupo: los '
-    +'participantes no llevan código propio, no se emite informe individual y no se les '
-    +'aplica la escala Warwick. De cada uno se extraen los datos de trazabilidad.'
+  TG:'Genera el Informe de Terapias Grupales. El código es del grupo, pero a cada '
+    +'participante mayor de 17 años sí se le aplica la escala Warwick.'
 };
 
 const AYUDA_ADJ={
@@ -222,37 +250,10 @@ const AYUDA_ADJ={
 };
 
 let modo='TI', wavBlob=null;
-// ---------------------------------------------------------- profesional
-// Quién está usando el sistema. Viaja en el enlace (?prof=PV) para que cada
-// una guarde su acceso ya fijado. De aquí sale su localidad, su agenda y la
-// firma de sus documentos.
-const PROFESIONALES = {
-  MN:{nombre:'Milton Naula',   loc:'MB', localidad:'Manabí'},
-  PV:{nombre:'Paola Vallejo',  loc:'G',  localidad:'Guayaquil'},
-  PO:{nombre:'Paulina Ortega', loc:'G',  localidad:'Guayaquil'},
-  MS:{nombre:'Mariana Solís',  loc:'M',  localidad:'Milagro'},
-  NR:{nombre:'Narcisa Rubio',  loc:'M',  localidad:'Milagro'}
-};
-function profesionalActual(){
-  const u=new URLSearchParams(location.search).get('prof');
-  if(PROFESIONALES[u]) return u;
-  // compatibilidad con los enlaces viejos que llevaban ?loc=
-  const l=new URLSearchParams(location.search).get('loc');
-  const porLoc={MB:'MN',G:'PV',M:'MS'};
-  return porLoc[l] || 'MN';
-}
-function cambiarProfesional(){
-  const v=document.getElementById('profesional').value;
-  const u=new URL(location.href);
-  u.searchParams.set('prof',v);
-  u.searchParams.delete('loc');
-  location.replace(u.toString());
-}
-const PROF = profesionalActual();
-const LOC  = PROFESIONALES[PROF].loc;
-document.getElementById('profesional').value=PROF;
-
+let LUGAR=null;               // {sigla, nombre} una vez resuelto
+let temporizadorLugar=null;
 let ctx,fuente,proc,pista,trozos=[],hzOrigen=48000,grabando=false,t0,cronometro;
+
 const val=id=>document.getElementById(id).value.trim();
 const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
@@ -266,16 +267,105 @@ function ponerModo(m,btn){
   pintarCodigo();
 }
 
-function armarCodigo(){
-  const p=LOC, l=val('lugar'), n=val('num');
-  if(!p||!l||!n) return null;
-  return PROYECTO+'_'+INDICADOR+'_'+p+'-'+l+'-'+modo+'-'+String(n).padStart(3,'0')+'-'+ANIO;
+// ------------------------------------------------------------- lugar
+function lugarDebounce(){
+  LUGAR=null; pintarCodigo();
+  clearTimeout(temporizadorLugar);
+  temporizadorLugar=setTimeout(resolverLugar,450);
 }
+
+async function resolverLugar(){
+  const txt=val('lugar');
+  const est=document.getElementById('estadoLugar');
+  if(!txt){ est.textContent=''; LUGAR=null; pintarCodigo(); return; }
+  est.textContent='Buscando…';
+  try{
+    const d=await pedir({accion:'lugarResolver',texto:txt,localidad:LOC});
+    if(d.encontrado){
+      LUGAR={sigla:d.sigla,nombre:d.nombre};
+      est.innerHTML='<b style="color:var(--oliva)">'+esc(d.sigla)+'</b> · '+esc(d.nombre)
+        +(d.exacto?'':' <span style="color:var(--apagado)">(por parecido)</span>');
+    }else{
+      LUGAR=null;
+      est.innerHTML='Lugar nuevo. Sigla propuesta: <b>'+esc(d.propuesta)+'</b> '
+        +'<button class="btn-mini" onclick="registrarLugar(\''+esc(d.propuesta)+'\')">Usar</button> '
+        +'<button class="btn-mini" onclick="otraSigla()">Otra</button>';
+    }
+  }catch(e){ est.textContent='No se pudo consultar el catálogo'; }
+  pintarCodigo();
+}
+
+async function registrarLugar(sigla){
+  try{
+    const d=await pedir({accion:'lugarRegistrar',localidad:LOC,sigla:sigla,
+                         nombre:val('lugar'),profesional:PROF});
+    LUGAR={sigla:d.sigla,nombre:d.nombre};
+    document.getElementById('estadoLugar').innerHTML=
+      '<b style="color:var(--oliva)">'+esc(d.sigla)+'</b> · '+esc(d.nombre)
+      +(d.yaExistia?'':' · agregado al catálogo');
+    cargarLugares();
+  }catch(e){
+    document.getElementById('estadoLugar').innerHTML=
+      '<span style="color:var(--senal)">'+esc(e.message)+'</span> '
+      +'<button class="btn-mini" onclick="otraSigla()">Elegir otra</button>';
+  }
+  pintarCodigo();
+}
+
+function otraSigla(){
+  const s=prompt('Sigla para "'+val('lugar')+'" (2 a 5 letras o números):','');
+  if(s && s.trim()) registrarLugar(s.trim().toUpperCase());
+}
+
+async function cargarLugares(){
+  try{
+    const d=await pedir({accion:'lugarListar',localidad:LOC});
+    document.getElementById('lugares').innerHTML=
+      d.lugares.map(l=>'<option value="'+esc(l.nombre)+'">'+esc(l.sigla)+'</option>').join('');
+  }catch(e){}
+}
+
+// ------------------------------------------------------------- código
+function armarCodigo(){
+  const n=val('num');
+  if(!LUGAR || !n) return null;
+  const partes=[LOC];
+  if(LOC==='MB'){
+    const c=val('canton');
+    if(!c) return null;
+    partes.push(c);
+  }
+  partes.push(LUGAR.sigla, modo, String(n).padStart(3,'0'));
+  return 'K-COL-2025-9005_R1A6_'+partes.join('-');
+}
+
 function pintarCodigo(){
-  const c=armarCodigo(),el=document.getElementById('codigo');
-  if(c){el.textContent=c;el.classList.add('listo');}
-  else{el.textContent='Completa los campos para generar el código';el.classList.remove('listo');}
+  const c=armarCodigo(), el=document.getElementById('codigo');
+  if(c){ el.textContent=c; el.classList.add('listo'); }
+  else{
+    el.textContent = !LUGAR ? 'Escribe el lugar de intervención'
+      : (LOC==='MB' && !val('canton')) ? 'Falta el cantón'
+      : 'Falta el número de '+(modo==='TG'?'grupo':'paciente');
+    el.classList.remove('listo');
+  }
   revisarEnvio();
+}
+
+async function sugerirNumero(){
+  try{
+    const d=await pedir({accion:'lugarSiguienteNumero',localidad:LOC,tipo:modo});
+    const el=document.getElementById('num');
+    if(!el.value) el.placeholder=String(d.numero);
+  }catch(e){}
+}
+
+async function pedir(datos){
+  if(URL_BACKEND.indexOf('PEGA_AQUI')===0)
+    throw new Error('Falta la dirección del servidor en este archivo.');
+  const r=await fetch(URL_BACKEND,{method:'POST',body:new URLSearchParams(datos)});
+  const d=await r.json();
+  if(!d.exito) throw new Error(d.error||'error sin detalle');
+  return d;
 }
 
 // ------------------------------------------------------------- grabar
@@ -560,9 +650,22 @@ function decir(clase,titulo,texto){
   pintarCodigo();
 })();
 
+// cantones solo en Manabí
+(function(){
+  const caja=document.getElementById('cajaCanton');
+  const sel=document.getElementById('canton');
+  if(LOC==='MB'){
+    caja.hidden=false;
+    sel.innerHTML='<option value="">—</option>'
+      + CANTONES_MB.map(([v,t])=>'<option value="'+v+'">'+t+'</option>').join('');
+  } else caja.hidden=true;
+})();
+
 document.getElementById('sesion').addEventListener('input',revisarEnvio);
 document.getElementById('explica').textContent=TEXTOS.TI;
 document.getElementById('ayudaAdj').textContent=AYUDA_ADJ.TI;
+cargarLugares();
+sugerirNumero();
 revisarEnvio();
 </script>
 </body>
