@@ -670,16 +670,6 @@ function decir(clase,titulo,texto){
     '<div class="aviso '+clase+'"><b>'+titulo+'</b>'+texto+'</div>';
 }
 
-// llenar el desplegable de lugar según la localidad
-(function(){
-  const sel=document.getElementById('lugar');
-  const lista=CANTONES[LOC]||CANTONES.MB;
-  sel.innerHTML=(lista.length>1?'<option value="">—</option>':'')
-    + lista.map(([v,t])=>'<option value="'+v+'">'+t+'</option>').join('');
-  if(lista.length===1) sel.value=lista[0][0];
-  pintarCodigo();
-})();
-
 document.getElementById('profesional').value=PROF;
 
 // cantones solo en Manabí

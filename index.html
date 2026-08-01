@@ -192,7 +192,7 @@ async function comprobar(){
     return false;
   }
   try{
-    const r=await fetch(URL_BACKEND);
+    const r=await fetch(URL_BACKEND+'?ping=1');
     const d=await r.json();
     el.innerHTML='<span class="punto ok"></span>Servidor conectado · '+esc(d.version||'');
     return true;
