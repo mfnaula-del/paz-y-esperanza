@@ -291,7 +291,9 @@ table.of td.c{text-align:center;width:11%}
       <div class="paso-cabeza"><span class="paso-num">00</span><span class="paso-titulo">Cargar en lote</span></div>
       <div class="carta">
         <p class="ayuda" style="margin-bottom:11px">¿Ya aplicaste el Warwick en papel?
-          Sube los escaneos y el sistema los lee y los reparte solo, sin marcar uno por uno.</p>
+          Sube los escaneos y el sistema los lee y los reparte solo, sin marcar uno por uno.
+          Puedes subir todas juntas: se procesan de a cuatro, con pausas, para no saturar
+          el servicio.</p>
         <div class="auto" style="margin-bottom:10px">
           <span class="chip-lbl" style="color:var(--oliva)">Momento</span>
           <button class="chip chip-claro" id="chipPre"  aria-pressed="true"
@@ -1095,31 +1097,70 @@ function lPonerMomento(v){
   document.getElementById('chipPost').setAttribute('aria-pressed', v==='post');
 }
 
+// El nivel gratuito de Gemini permite 10 peticiones por minuto. Cada hoja es una
+// petición, así que las tandas se envían de a pocas y con pausa entre ellas.
+// Es más lento pero no se topa, y así nadie tiene que contar archivos.
+const POR_TANDA = 4, PAUSA_MS = 22000;
+const dormir = ms => new Promise(r=>setTimeout(r,ms));
+
 async function lLeerEscaneos(input){
   const files=[...input.files]; input.value='';
   if(!files.length) return;
   const cg=document.getElementById('lCargando');
   cg.classList.add('on');
-  cg.textContent='Leyendo '+files.length+' hoja(s)… puede tardar un minuto.';
   document.getElementById('lSalida').innerHTML='';
+
+  const tandas=[];
+  for(let i=0;i<files.length;i+=POR_TANDA) tandas.push(files.slice(i,i+POR_TANDA));
+
+  LHOJAS=[]; LCAND=[];
+  let leidas=0, sinFecha=0, incompletas=0, sinDueno=0, fallos=[];
+
   try{
-    const cuerpo=new URLSearchParams();
-    cuerpo.append('accion','leerEscaneos');
-    cuerpo.append('localidad',LOC);
-    cuerpo.append('momento',LMOMENTO);
-    for(const f of files){
-      const a = f.type==='application/pdf' ? await gLeerPdf(f) : await gComprimir(f);
-      cuerpo.append('adjunto',a.b64);
-      cuerpo.append('adjuntoMime',a.mime);
+    for(let t=0;t<tandas.length;t++){
+      cg.textContent = tandas.length>1
+        ? 'Leyendo tanda '+(t+1)+' de '+tandas.length+'… ('+leidas+' de '+files.length+' listas)'
+        : 'Leyendo '+files.length+' hoja(s)… puede tardar un minuto.';
+
+      const cuerpo=new URLSearchParams();
+      cuerpo.append('accion','leerEscaneos');
+      cuerpo.append('localidad',LOC);
+      cuerpo.append('momento',LMOMENTO);
+      for(const f of tandas[t]){
+        const a = f.type==='application/pdf' ? await gLeerPdf(f) : await gComprimir(f);
+        cuerpo.append('adjunto',a.b64);
+        cuerpo.append('adjuntoMime',a.mime);
+      }
+
+      try{
+        const r=await fetch(URL_BACKEND,{method:'POST',body:cuerpo});
+        const d=await r.json();
+        if(!d.exito) throw new Error(d.error||'error');
+        if(!LCAND.length) LCAND=d.candidatos||[];
+        LHOJAS=LHOJAS.concat(d.hojas.map(h=>({...h,
+          resp:h.respuestas.map(v=>(v>=1&&v<=5)?v:null), fecha:h.fecha||'', abierto:false})));
+        leidas+=d.hojas.length;
+        sinFecha+=d.sin_fecha||0; incompletas+=d.incompletas||0; sinDueno+=d.sin_emparejar||0;
+      }catch(e){
+        fallos.push('tanda '+(t+1)+': '+e.message);
+      }
+
+      // pausa antes de la siguiente, para no agotar el límite por minuto
+      if(t < tandas.length-1){
+        for(let s=Math.round(PAUSA_MS/1000); s>0; s--){
+          cg.textContent='Leídas '+leidas+' de '+files.length+'. '
+            +'Esperando '+s+'s para no saturar el servicio…';
+          await dormir(1000);
+        }
+      }
     }
-    const r=await fetch(URL_BACKEND,{method:'POST',body:cuerpo});
-    const d=await r.json();
+
     cg.classList.remove('on');
-    if(!d.exito) throw new Error(d.error||'error');
-    LCAND=d.candidatos||[];
-    LHOJAS=d.hojas.map(h=>({...h, resp:h.respuestas.map(v=>(v>=1&&v<=5)?v:null),
-                            fecha:h.fecha||'', abierto:false}));
-    lDibujar(d);
+    if(!LHOJAS.length) throw new Error(fallos.join(' · ') || 'no se pudo leer ninguna hoja');
+    lDibujar({sin_fecha:sinFecha, incompletas:incompletas, sin_emparejar:sinDueno});
+    if(fallos.length) document.getElementById('lSalida').insertAdjacentHTML('afterbegin',
+      '<div class="aviso neutro"><b>'+fallos.length+' tanda(s) fallaron</b>'
+      +esc(fallos.join(' · '))+'<br>Vuelve a subir solo esas hojas.</div>');
   }catch(e){
     cg.classList.remove('on');
     document.getElementById('lSalida').innerHTML=
@@ -1643,24 +1684,54 @@ async function gLeerEscaneos(input){
   if(!files.length) return;
   const cg=document.getElementById('gCargando');
   cg.classList.add('on');
-  cg.textContent='Leyendo '+files.length+' hoja(s)… puede tardar un minuto.';
   document.getElementById('gAviso').innerHTML='';
+
+  const tandas=[];
+  for(let i=0;i<files.length;i+=POR_TANDA) tandas.push(files.slice(i,i+POR_TANDA));
+  let acumulado={hojas:[],sin_emparejar:0,incompletas:0,sin_fecha:0};
+  const fallos=[];
+
   try{
-    const cuerpo=new URLSearchParams();
-    cuerpo.append('accion','leerEscaneos');
-    cuerpo.append('codigo',GRUPO.codigo);
-    cuerpo.append('localidad',LOC);
-    cuerpo.append('momento',GMOMENTO);
-    for(const f of files){
-      const a = f.type==='application/pdf' ? await gLeerPdf(f) : await gComprimir(f);
-      cuerpo.append('adjunto',a.b64);
-      cuerpo.append('adjuntoMime',a.mime);
+    for(let t=0;t<tandas.length;t++){
+      cg.textContent = tandas.length>1
+        ? 'Leyendo tanda '+(t+1)+' de '+tandas.length+'…'
+        : 'Leyendo '+files.length+' hoja(s)… puede tardar un minuto.';
+
+      const cuerpo=new URLSearchParams();
+      cuerpo.append('accion','leerEscaneos');
+      cuerpo.append('codigo',GRUPO.codigo);
+      cuerpo.append('localidad',LOC);
+      cuerpo.append('momento',GMOMENTO);
+      for(const f of tandas[t]){
+        const a = f.type==='application/pdf' ? await gLeerPdf(f) : await gComprimir(f);
+        cuerpo.append('adjunto',a.b64);
+        cuerpo.append('adjuntoMime',a.mime);
+      }
+
+      try{
+        const r=await fetch(URL_BACKEND,{method:'POST',body:cuerpo});
+        const d=await r.json();
+        if(!d.exito) throw new Error(d.error||'error');
+        acumulado.hojas=acumulado.hojas.concat(d.hojas);
+        acumulado.sin_emparejar+=d.sin_emparejar||0;
+        acumulado.incompletas+=d.incompletas||0;
+        acumulado.sin_fecha+=d.sin_fecha||0;
+      }catch(e){ fallos.push('tanda '+(t+1)+': '+e.message); }
+
+      if(t < tandas.length-1){
+        for(let s=Math.round(PAUSA_MS/1000); s>0; s--){
+          cg.textContent='Leídas '+acumulado.hojas.length+' de '+files.length
+            +'. Esperando '+s+'s para no saturar el servicio…';
+          await dormir(1000);
+        }
+      }
     }
-    const r=await fetch(URL_BACKEND,{method:'POST',body:cuerpo});
-    const d=await r.json();
     cg.classList.remove('on');
-    if(!d.exito) throw new Error(d.error||'error');
-    gAplicarLectura(d);
+    if(!acumulado.hojas.length) throw new Error(fallos.join(' · ') || 'no se pudo leer ninguna hoja');
+    gAplicarLectura(acumulado);
+    if(fallos.length) document.getElementById('gAviso').insertAdjacentHTML('afterbegin',
+      '<div class="aviso neutro"><b>'+fallos.length+' tanda(s) fallaron</b>'
+      +esc(fallos.join(' · '))+'</div>');
   }catch(e){
     cg.classList.remove('on');
     document.getElementById('gAviso').innerHTML=
