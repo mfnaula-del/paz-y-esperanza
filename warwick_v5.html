@@ -1321,7 +1321,7 @@ async function elegirFicha(i){
   const caja=document.getElementById('fichaSalida');
   caja.innerHTML='<div class="cargando on">Abriendo…</div>';
   try{
-    const d=await pedir({accion:'ficha',codigo:p.codigo});
+    const d=await pedir({accion:'ficha',codigo:p.codigo,nombre:p.nombre});
     let html='';
     if(d.pre)  html+=hojaOficial(d,'pre');
     if(d.post) html+=hojaOficial(d,'post');
