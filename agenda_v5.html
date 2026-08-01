@@ -30,6 +30,10 @@ h1{font-size:22px;font-weight:600;letter-spacing:-.02em;margin-top:4px}
 .loc{margin:16px 0 0;background:var(--carta);border:1px solid var(--linea);
   border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px}
 .loc label{margin:0;white-space:nowrap;font-size:10px}
+.loc.fijo{display:block;background:var(--oliva);border-color:var(--oliva);padding:13px 15px}
+.loc.fijo label{color:#9FB09C;display:block;margin-bottom:3px}
+.fijo-nombre{display:block;color:#fff;font-size:17px;font-weight:600;letter-spacing:-.01em}
+.fijo-loc{display:block;color:#C7D3C4;font-size:12.5px;margin-top:2px}
 .loc select{font-size:14px;padding:7px 8px;border:0;background:transparent;font-weight:600;
   color:var(--oliva);width:auto;flex:1}
 .paso{margin-top:22px}
@@ -136,7 +140,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 
   <p style="margin-bottom:14px"><a href="index.html" style="color:#7A8579;text-decoration:none;font-size:12.5px">&larr; Inicio</a></p>
   <p class="eyebrow">Paz y Esperanza · Ecuador</p>
-  <h1>Agenda</h1>
+  <h1 id="titulo">Agenda</h1>
   <p class="sub">Agenda con solo el nombre. El código nace en la primera sesión.</p>
   <p class="ayuda" style="margin-top:8px">Dicta la cita o llénala a mano. Si el horario
     ya está tomado, el sistema te avisa y te propone los huecos libres más cercanos.</p>
@@ -298,14 +302,18 @@ const PROFESIONALES = {
   NR:{nombre:'Narcisa Rubio',  loc:'M',  localidad:'Milagro'}
 };
 function profesionalActual(){
-  const u=new URLSearchParams(location.search).get('prof');
+  const q=new URLSearchParams(location.search);
+  const u=q.get('prof');
   if(PROFESIONALES[u]) return u;
+  // en modo solo-agenda hace falta indicar de quién es la agenda
+  if(q.get('solo')==='1') return null;
   // compatibilidad con los enlaces viejos que llevaban ?loc=
   const l=new URLSearchParams(location.search).get('loc');
   const porLoc={MB:'MN',G:'PV',M:'MS'};
   return porLoc[l] || 'MN';
 }
 function cambiarProfesional(){
+  if(typeof SOLO_AGENDA!=='undefined' && SOLO_AGENDA) return;
   const v=document.getElementById('profesional').value;
   const u=new URL(location.href);
   u.searchParams.set('prof',v);
@@ -313,12 +321,22 @@ function cambiarProfesional(){
   location.replace(u.toString());
 }
 const PROF = profesionalActual();
-const LOC  = PROFESIONALES[PROF].loc;
-// ?solo=1 → enlace para quien solo agenda: sin acceso al resto del sistema
-if(new URLSearchParams(location.search).get('solo')==='1'){
+const LOC  = PROF ? PROFESIONALES[PROF].loc : '';
+// ?solo=1 → enlace para quien agenda desde territorio.
+// Queda fijo en un solo profesional: no se puede cambiar ni ver el de nadie más,
+// para que no haya equivocaciones en campo.
+const SOLO_AGENDA = new URLSearchParams(location.search).get('solo')==='1';
+if(SOLO_AGENDA){
   document.querySelectorAll('a[href^="index.html"]').forEach(a=>a.remove());
+  document.title='Agendar cita · '+PROFESIONALES[PROF].nombre;
+  const caja=document.getElementById('cajaLoc');
+  caja.classList.add('fijo');
+  caja.innerHTML='<label>Agenda de</label>'
+    +'<span class="fijo-nombre">'+PROFESIONALES[PROF].nombre+'</span>'
+    +'<span class="fijo-loc">'+PROFESIONALES[PROF].localidad+'</span>';
+}else{
+  document.getElementById('profesional').value=PROF;
 }
-document.getElementById('profesional').value=PROF;
 
 const val=id=>document.getElementById(id).value.trim();
 const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -672,8 +690,17 @@ async function marcar(fila,estado){
 
 // fecha de hoy por defecto
 document.getElementById('fecha').value = new Date().toISOString().slice(0,10);
-cambiarAtencion();
-cambiarFecha();
+if(!PROF){
+  document.querySelector('.envoltura').innerHTML=
+    '<p class="eyebrow">Paz y Esperanza · Ecuador</p>'
+   +'<h1>Falta indicar la agenda</h1>'
+   +'<div class="aviso error" style="margin-top:14px"><b>Enlace incompleto</b>'
+   +'Este enlace no dice de quién es la agenda. Pide el enlace correcto a la persona '
+   +'que te lo compartió: debe terminar en <b>&prof=</b> seguido de sus iniciales.</div>';
+}else{
+  cambiarAtencion();
+  cambiarFecha();
+}
 </script>
 </body>
 </html>
