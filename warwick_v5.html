@@ -235,32 +235,44 @@ table.of td.c{text-align:center;width:11%}
 @media print{
   @page{size:A4;margin:12mm}
   body{background:#fff;padding:0;font-size:10.5pt}
-  .no-imprimir{display:none!important}
   .envoltura{max-width:none}
-  .hoja{border:0;border-radius:0;padding:0;margin:0}
+
+  /* lo que solo sirve en pantalla */
+  .no-imprimir, .oculto-print{display:none!important}
+
+  /* Solo se imprime la pestaña abierta. Las demás quedan fuera para que no
+     generen páginas en blanco antes del contenido. */
+  .vista{display:none!important}
+  .vista.on{display:block!important}
+
+  /* En la pestaña grupal solo salen las hojas en blanco de #gImpresion,
+     no la pantalla de trabajo. */
+  #v-grupal .paso, #v-grupal .cabecera-grupo, #v-grupal .acciones-grupo,
+  #v-grupal .resumen-grupo, #gAviso, #gSalida{display:none!important}
+  #gImpresion{display:block!important}
+
+  /* La hoja del formulario. Puede continuar en la página siguiente: una ficha
+     con pre y post no cabe en una sola, y prohibirle partirse hacía que el
+     navegador no la imprimiera. */
+  .hoja{border:0;border-radius:0;padding:0;margin:0;display:block!important}
+  .hoja + .hoja{page-break-before:always; break-before:page}
+
+  /* las tablas pueden continuar, pero una fila no se parte por la mitad */
+  table.of{page-break-inside:auto}
+  table.of tr{page-break-inside:avoid; break-inside:avoid}
+
+  /* los fondos de la tabla oficial deben salir impresos */
   table.of thead th{background:var(--azul-fila)!important;color:#fff!important;
     -webkit-print-color-adjust:exact;print-color-adjust:exact}
   table.of td.et{background:var(--azul-suave)!important;
     -webkit-print-color-adjust:exact;print-color-adjust:exact}
   table.of tbody tr:nth-child(even){background:#F2F4F7!important;
     -webkit-print-color-adjust:exact;print-color-adjust:exact}
-  tr{page-break-inside:avoid}
-  .oculto-print{display:none!important}
-  /* Solo se imprime la pestaña que está abierta. Las otras vistas quedan
-     ocultas con display:none, pero al imprimir seguían generando páginas
-     en blanco antes del contenido. */
-  .vista{display:none!important}
-  .vista.on{display:block!important}
-
-  /* En la pestaña grupal solo debe salir #gImpresion, que son las hojas
-     en blanco, no la pantalla de trabajo. */
-  #v-grupal .paso, #v-grupal .cabecera-grupo, #v-grupal .acciones-grupo,
-  #v-grupal .resumen-grupo, #gAviso, #gSalida{display:none!important}
-  #gImpresion, #gImpresion .hoja{display:block!important}
-
-  /* Cada hoja arranca en su propia página y no se parte por la mitad. */
-  .hoja{page-break-inside:avoid; break-inside:avoid}
-  .hoja + .hoja{page-break-before:always; break-before:page}
+  .nota-metodo{background:#F6F7F9!important;-webkit-print-color-adjust:exact;
+    print-color-adjust:exact;font-size:8pt}
+  .pill{border:1px solid #999}
+  .marca{border-color:#000}
+  .marca.on{background:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
