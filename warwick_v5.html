@@ -255,9 +255,16 @@ table.of td.c{text-align:center;width:11%}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.3/html2pdf.bundle.min.js"
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"
         integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg=="
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+// Si ese CDN no responde, se intenta otro. Sin generador de PDF el botón de
+// "Guardar en Drive" no sirve, así que vale la pena tener respaldo.
+if (typeof html2pdf === 'undefined') {
+  document.write('<scr' + 'ipt src="https://unpkg.com/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"><\/scr' + 'ipt>');
+}
+</script>
 </head>
 <body>
 <div class="envoltura">
@@ -1948,7 +1955,8 @@ async function pdfADrive(){
 /** Convierte una hoja de la pantalla en PDF A4, y lo devuelve en base64. */
 function hojaAPdf(nodo){
   if(typeof html2pdf==='undefined')
-    return Promise.reject(new Error('no se pudo cargar el generador de PDF: revisa la conexión'));
+    return Promise.reject(new Error('el generador de PDF no cargó. Recarga la página con '
+      + 'Ctrl+F5; si sigue igual, puede ser la conexión o un bloqueador de scripts'));
   return html2pdf().set({
       margin: [10,10,10,10],
       image: {type:'jpeg', quality:0.95},
