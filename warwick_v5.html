@@ -238,7 +238,6 @@ table.of td.c{text-align:center;width:11%}
   .no-imprimir{display:none!important}
   .envoltura{max-width:none}
   .hoja{border:0;border-radius:0;padding:0;margin:0}
-  .hoja + .hoja{page-break-before:always;margin-top:0}
   table.of thead th{background:var(--azul-fila)!important;color:#fff!important;
     -webkit-print-color-adjust:exact;print-color-adjust:exact}
   table.of td.et{background:var(--azul-suave)!important;
@@ -247,11 +246,21 @@ table.of td.c{text-align:center;width:11%}
     -webkit-print-color-adjust:exact;print-color-adjust:exact}
   tr{page-break-inside:avoid}
   .oculto-print{display:none!important}
-  /* al imprimir las hojas en blanco solo debe salir #gImpresion,
-     no la pantalla de trabajo del módulo grupal */
+  /* Solo se imprime la pestaña que está abierta. Las otras vistas quedan
+     ocultas con display:none, pero al imprimir seguían generando páginas
+     en blanco antes del contenido. */
+  .vista{display:none!important}
+  .vista.on{display:block!important}
+
+  /* En la pestaña grupal solo debe salir #gImpresion, que son las hojas
+     en blanco, no la pantalla de trabajo. */
   #v-grupal .paso, #v-grupal .cabecera-grupo, #v-grupal .acciones-grupo,
   #v-grupal .resumen-grupo, #gAviso, #gSalida{display:none!important}
   #gImpresion, #gImpresion .hoja{display:block!important}
+
+  /* Cada hoja arranca en su propia página y no se parte por la mitad. */
+  .hoja{page-break-inside:avoid; break-inside:avoid}
+  .hoja + .hoja{page-break-before:always; break-before:page}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
