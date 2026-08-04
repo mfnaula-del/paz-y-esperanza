@@ -129,6 +129,49 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 .hueco:hover{border-color:var(--oliva)}
 .forzar{background:none;border:0;color:var(--ambar);font-family:inherit;font-size:12px;
   text-decoration:underline;cursor:pointer;margin-top:10px;padding:0}
+.nav-semana{display:flex;align-items:center;gap:10px;justify-content:space-between}
+.nav-semana button{width:38px;height:38px;border:1px solid var(--linea);background:#FBFBFA;
+  border-radius:9px;font-size:19px;color:var(--oliva);cursor:pointer;line-height:1}
+.nav-semana button:hover{border-color:var(--oliva)}
+.nav-semana span{flex:1;text-align:center;font-size:14px;font-weight:600}
+
+.dia{margin-top:14px}
+.dia-cab{display:flex;align-items:baseline;gap:9px;padding:0 2px 7px}
+.dia-nom{font-size:13px;font-weight:700;letter-spacing:.02em;text-transform:capitalize}
+.dia-fecha{font-family:var(--mono);font-size:11.5px;color:var(--apagado)}
+.dia.hoy .dia-nom{color:var(--senal)}
+.dia-lugar{margin-left:auto;font-size:11px;padding:2px 9px;border-radius:20px;
+  background:#EDF1EC;color:#2C351F;font-weight:600}
+.dia-lugar.especial{background:#FDF3E3;color:#5C4210}
+
+.franjas{background:var(--carta);border:1px solid var(--linea);border-radius:11px;overflow:hidden}
+.dia.hoy .franjas{border-color:var(--senal)}
+.franja{display:flex;gap:11px;padding:9px 12px;border-bottom:1px solid var(--linea);
+  align-items:flex-start}
+.franja:last-child{border-bottom:0}
+.franja.libre{opacity:.42}
+.franja .hora{font-family:var(--mono);font-size:12px;color:var(--oliva);
+  min-width:44px;padding-top:1px;font-weight:600}
+.franja.libre .hora{color:var(--apagado);font-weight:400}
+.franja .cont{flex:1;min-width:0}
+.franja .nom{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.franja .det{font-size:11.5px;color:var(--apagado);margin-top:2px;line-height:1.4}
+.franja .vacio{font-size:12.5px;color:var(--apagado)}
+.franja .etq{display:inline-block;padding:1px 7px;border-radius:20px;font-size:9.5px;
+  font-weight:700;margin-left:5px;vertical-align:1px}
+.e-virtual{background:#EEF0F3;color:#3A424C}
+.e-pend{background:#FDF3E3;color:#7A5410}
+.e-hecha{background:#E3EFE0;color:#2C351F}
+.e-falta{background:#FBEBE8;color:#7B241A}
+
+.dia-vacio{background:var(--carta);border:1px dashed var(--linea);border-radius:11px;
+  padding:15px;text-align:center;font-size:12.5px;color:var(--apagado)}
+.resumen-sem{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:6px}
+.resumen-sem div{background:var(--carta);border:1px solid var(--linea);border-radius:9px;
+  padding:10px;text-align:center}
+.resumen-sem b{display:block;font-family:var(--mono);font-size:20px;font-weight:400;color:var(--oliva)}
+.resumen-sem span{font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--apagado)}
+
 .cargando{display:none;text-align:center;padding:20px;font-size:13px;color:var(--apagado)}
 .cargando.on{display:block}
 .pie{margin-top:28px;font-size:11.5px;color:var(--apagado);line-height:1.6;text-align:center}
@@ -159,6 +202,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
   <div class="modo" role="tablist">
     <button role="tab" aria-selected="true"  onclick="verVista('nueva',this)">Agendar</button>
     <button role="tab" aria-selected="false" onclick="verVista('lista',this)">Próximas</button>
+    <button role="tab" aria-selected="false" onclick="verVista('horario',this)">Horario</button>
   </div>
 
   <!-- ================= AGENDAR ================= -->
@@ -279,6 +323,23 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
     <div id="listaSalida" style="margin-top:16px"></div>
   </div>
 
+  <!-- ================= HORARIO ================= -->
+  <div class="vista" id="v-horario">
+    <section class="paso">
+      <div class="paso-cabeza"><span class="paso-num">01</span><span class="paso-titulo">Semana</span></div>
+      <div class="carta">
+        <div class="nav-semana">
+          <button onclick="hSemana(-1)" aria-label="Semana anterior">‹</button>
+          <span id="hRotulo">—</span>
+          <button onclick="hSemana(1)" aria-label="Semana siguiente">›</button>
+        </div>
+        <button class="btn btn-suave" onclick="hHoy()">Volver a esta semana</button>
+      </div>
+    </section>
+    <div class="cargando" id="hCargando">Cargando…</div>
+    <div id="hSalida"></div>
+  </div>
+
   <p class="pie">Documento confidencial · Fundación Paz y Esperanza<br>
     Milton Fernando Naula Chimbo</p>
 </div>
@@ -347,6 +408,7 @@ function verVista(v,btn){
   document.querySelectorAll('.modo button').forEach(b=>b.setAttribute('aria-selected','false'));
   btn.setAttribute('aria-selected','true');
   if(v==='lista') listar();
+  if(v==='horario') hDibujar();
 }
 
 async function pedir(datos){
@@ -626,6 +688,145 @@ function limpiar(){
   document.getElementById('salida').innerHTML='';
   revisar();
   document.getElementById('nombre').focus();
+}
+
+
+// ============================================================================
+//  HORARIO
+//  La misma agenda, pero vista como semana: de un vistazo se ve dónde hay que
+//  estar cada día, quién está citado y qué franjas quedan libres.
+// ============================================================================
+const H_INICIO = 8, H_FIN = 17;   // horario de trabajo
+let H_LUNES = null;               // lunes de la semana que se está mirando
+
+function lunesDe(f){
+  const d = new Date(f);
+  d.setHours(0,0,0,0);
+  const n = d.getDay();                       // 0 domingo
+  d.setDate(d.getDate() - (n===0 ? 6 : n-1)); // retrocede al lunes
+  return d;
+}
+
+function hHoy(){ H_LUNES = lunesDe(new Date()); hDibujar(); }
+function hSemana(n){
+  if(!H_LUNES) H_LUNES = lunesDe(new Date());
+  H_LUNES = new Date(H_LUNES.getTime() + n*7*86400000);
+  hDibujar();
+}
+
+const DIAS_ES=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const MESES_ES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto',
+                'septiembre','octubre','noviembre','diciembre'];
+const iso = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')
+                 +'-'+String(d.getDate()).padStart(2,'0');
+
+async function hDibujar(){
+  if(!H_LUNES) H_LUNES = lunesDe(new Date());
+  const cg=document.getElementById('hCargando');
+  const caja=document.getElementById('hSalida');
+  const viernes=new Date(H_LUNES.getTime()+4*86400000);
+
+  document.getElementById('hRotulo').textContent =
+    H_LUNES.getDate()+' – '+viernes.getDate()+' de '+MESES_ES[viernes.getMonth()]
+    +(H_LUNES.getMonth()!==viernes.getMonth()
+      ? ' ('+MESES_ES[H_LUNES.getMonth()]+'–'+MESES_ES[viernes.getMonth()]+')':'')
+    +' '+viernes.getFullYear();
+
+  cg.classList.add('on');
+  try{
+    const d=await pedir({accion:'agendaListar',filtro:'',dias:'90',profesional:PROF});
+    cg.classList.remove('on');
+
+    // repartir las citas por día
+    const porDia={};
+    d.citas.forEach(c=>{
+      const k=c.iso.slice(0,10);
+      (porDia[k]=porDia[k]||[]).push(c);
+    });
+
+    const hoyISO=iso(new Date());
+    let html='', totalSem=0, pendSem=0;
+    const dias=[];
+
+    for(let i=0;i<5;i++){                       // lunes a viernes
+      const f=new Date(H_LUNES.getTime()+i*86400000);
+      const k=iso(f);
+      const citas=(porDia[k]||[]).sort((a,b)=>a.iso.localeCompare(b.iso));
+      totalSem+=citas.length;
+      pendSem+=citas.filter(c=>c.estado==='Agendada').length;
+      dias.push({f,k,citas});
+    }
+
+    html+='<div class="resumen-sem">'
+      +'<div><b>'+totalSem+'</b><span>Citas</span></div>'
+      +'<div><b>'+pendSem+'</b><span>Por atender</span></div>'
+      +'<div><b>'+dias.filter(x=>x.citas.length).length+'</b><span>Días con agenda</span></div>'
+      +'</div>';
+
+    for(const {f,k,citas} of dias){
+      const esHoy = k===hoyISO;
+      let dispo=null;
+      try{ const r=await pedir({accion:'agendaDia',profesional:PROF,fecha:k});
+           dispo=r.disponibilidad; }catch(e){}
+
+      html+='<div class="dia'+(esHoy?' hoy':'')+'">'
+        +'<div class="dia-cab"><span class="dia-nom">'+DIAS_ES[f.getDay()]+'</span>'
+        +'<span class="dia-fecha">'+String(f.getDate()).padStart(2,'0')+'/'
+        +String(f.getMonth()+1).padStart(2,'0')+'</span>'
+        +(dispo?'<span class="dia-lugar'+(dispo.especial?' especial':'')+'">'
+                +esc(dispo.lugar)+'</span>':'')
+        +'</div>';
+
+      if(!citas.length){
+        html+='<div class="dia-vacio">Sin citas</div></div>';
+        continue;
+      }
+
+      html+='<div class="franjas">';
+      // franjas ocupadas, y las libres entre medio
+      let cursor=H_INICIO*60;
+      citas.forEach(c=>{
+        const [hh,mm]=c.cuando.slice(11,16).split(':').map(Number);
+        const ini=hh*60+mm, fin=ini+(c.duracion||60);
+        if(ini-cursor>=30) html+=franjaLibre(cursor,ini);
+        html+=franjaCita(c);
+        cursor=Math.max(cursor,fin);
+      });
+      if(H_FIN*60-cursor>=30) html+=franjaLibre(cursor,H_FIN*60);
+      html+='</div></div>';
+    }
+
+    caja.innerHTML=html;
+  }catch(e){
+    cg.classList.remove('on');
+    caja.innerHTML='<div class="aviso error"><b>No se pudo cargar</b>'+esc(e.message)+'</div>';
+  }
+}
+
+function hhmm(min){
+  return String(Math.floor(min/60)).padStart(2,'0')+':'+String(min%60).padStart(2,'0');
+}
+
+function franjaLibre(desde,hasta){
+  const h=Math.round((hasta-desde)/60*10)/10;
+  return '<div class="franja libre"><span class="hora">'+hhmm(desde)+'</span>'
+    +'<span class="cont"><span class="vacio">libre · '
+    +(h>=1?h+' h':(hasta-desde)+' min')+'</span></span></div>';
+}
+
+function franjaCita(c){
+  const etq = c.estado==='Atendida'   ? '<span class="etq e-hecha">atendida</span>'
+            : c.estado==='No asistió' ? '<span class="etq e-falta">no asistió</span>'
+            : c.vencida               ? '<span class="etq e-pend">sin marcar</span>' : '';
+  const virtual = c.atencion==='Virtual' ? '<span class="etq e-virtual">virtual</span>' : '';
+  return '<div class="franja"><span class="hora">'+esc(c.cuando.slice(11,16))+'</span>'
+    +'<span class="cont"><span class="nom">'+esc(c.nombre)+virtual+etq+'</span>'
+    +'<span class="det">hasta '+esc(c.hasta)
+    +(c.lugar?' · '+esc(c.lugar):'')
+    +(c.nueva?' · persona nueva':'')
+    +(c.motivo?'<br>'+esc(c.motivo):'')
+    +(c.atencion==='Virtual'&&c.contacto?'<br>'+esc(c.contacto):'')
+    +'</span></span></div>';
 }
 
 // ---------------------------------------------------------- listar

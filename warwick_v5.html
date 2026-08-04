@@ -157,6 +157,8 @@ table.of td.c{text-align:center;width:11%}
 .cabecera-grupo .cambiar{background:none;border:0;color:#fff;opacity:.7;font-family:inherit;
   font-size:12px;text-decoration:underline;cursor:pointer;margin-top:11px;padding:0}
 
+.acciones-ficha{display:flex;gap:8px;margin-top:12px}
+.acciones-ficha .btn{margin-top:0;flex:1}
 .acciones-grupo{display:flex;flex-direction:column;gap:8px;margin-top:12px}
 .acciones-grupo .btn{margin-top:0}
 
@@ -253,6 +255,9 @@ table.of td.c{text-align:center;width:11%}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.3/html2pdf.bundle.min.js"
+        integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body>
 <div class="envoltura">
@@ -1395,7 +1400,11 @@ async function elegirFicha(i){
     if(d.pre)  html+=hojaOficial(d,'pre');
     if(d.post) html+=hojaOficial(d,'post');
     if(d.pre&&d.post) html+=hojaComparativa(d);
-    html+='<button class="btn btn-tinta no-imprimir" onclick="window.print()">Imprimir</button>';
+    html+='<div class="acciones-ficha no-imprimir">'
+      +'<button class="btn btn-tinta" onclick="window.print()">Imprimir</button>'
+      +'<button class="btn btn-enviar" onclick="pdfADrive()">Guardar en Drive</button>'
+      +'</div><div id="pdfSalida" class="no-imprimir"></div>';
+    window.FICHA=d;
     caja.innerHTML=html;
     caja.scrollIntoView({behavior:'smooth',block:'start'});
   }catch(e){
@@ -1884,6 +1893,69 @@ function gHojaBlanco(d,p){
   + '<p style="margin-top:12px"><b>Observaciones:</b></p><div class="obs"></div>'
   + bloqueFirmas('')
   + '</div>';
+}
+
+
+// ============================================================================
+//  GUARDAR LA FICHA EN DRIVE
+//  El PDF lo arma el navegador, no el servidor: así sale idéntico a lo que se
+//  ve en pantalla, que es el formulario que pidió el donante. El conversor de
+//  Google Docs descuadraría la tabla.
+// ============================================================================
+
+async function pdfADrive(){
+  const d = window.FICHA;
+  if(!d) return;
+  const caja = document.getElementById('pdfSalida');
+  const hojas = [...document.querySelectorAll('#fichaSalida .hoja')];
+  if(!hojas.length){ caja.innerHTML='<div class="aviso error">No hay nada que guardar.</div>'; return; }
+
+  // una hoja, un archivo: pre, post y comparativo se guardan por separado
+  const momentos = [];
+  if(d.pre)  momentos.push('pre');
+  if(d.post) momentos.push('post');
+  if(d.pre && d.post) momentos.push('comparativo');
+
+  caja.innerHTML='<div class="aviso neutro"><b>Generando…</b>'
+    +'Esto puede tardar unos segundos por cada hoja.</div>';
+
+  const guardados=[], fallos=[];
+  for(let i=0;i<hojas.length;i++){
+    const momento = momentos[i] || 'pre';
+    try{
+      caja.innerHTML='<div class="aviso neutro"><b>Generando '+(i+1)+' de '+hojas.length+'…</b>'
+        +'No cierres la pestaña.</div>';
+      const b64 = await hojaAPdf(hojas[i]);
+      const r = await pedir({accion:'guardarPdf', codigo:d.codigo, nombre:d.nombre,
+                             momento:momento, pdf:b64});
+      guardados.push(r);
+    }catch(e){ fallos.push(momento+': '+e.message); }
+  }
+
+  if(guardados.length){
+    caja.innerHTML='<div class="aviso ok"><b>'+guardados.length+' archivo(s) en Drive</b>'
+      + guardados.map(g=>esc(g.archivo)).join('<br>')
+      + '<p style="margin-top:9px"><a href="'+esc(guardados[0].carpeta)+'" target="_blank" '
+      + 'rel="noopener">Abrir la carpeta del caso</a></p></div>'
+      + (fallos.length?'<div class="aviso neutro" style="margin-top:8px"><b>'+fallos.length
+         +' fallaron</b>'+esc(fallos.join(' · '))+'</div>':'');
+  }else{
+    caja.innerHTML='<div class="aviso error"><b>No se pudo guardar</b>'
+      +esc(fallos.join(' · '))+'</div>';
+  }
+}
+
+/** Convierte una hoja de la pantalla en PDF A4, y lo devuelve en base64. */
+function hojaAPdf(nodo){
+  if(typeof html2pdf==='undefined')
+    return Promise.reject(new Error('no se pudo cargar el generador de PDF: revisa la conexión'));
+  return html2pdf().set({
+      margin: [10,10,10,10],
+      image: {type:'jpeg', quality:0.95},
+      html2canvas: {scale:2, useCORS:true, backgroundColor:'#ffffff'},
+      jsPDF: {unit:'mm', format:'a4', orientation:'portrait'}
+    }).from(nodo).outputPdf('datauristring')
+      .then(uri => uri.split(',')[1]);
 }
 
 // ---------------------------------------------------------- reporte
