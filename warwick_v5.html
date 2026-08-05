@@ -33,6 +33,10 @@ h1{font-size:22px;font-weight:600;letter-spacing:-.02em;margin-top:4px}
 .loc{margin:16px 0 0;background:var(--carta);border:1px solid var(--linea);
   border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px}
 .loc label{margin:0;white-space:nowrap;font-size:10px}
+.loc.fijo{display:block;background:var(--oliva);border-color:var(--oliva);padding:13px 15px}
+.loc.fijo label{color:#9FB09C;display:block;margin-bottom:3px}
+.fijo-nombre{display:block;color:#fff;font-size:16px;font-weight:600;letter-spacing:-.01em}
+.fijo-loc{display:block;color:#C7D3C4;font-size:12.5px;margin-top:2px}
 .loc select{font-size:14px;padding:7px 8px;border:0;background:transparent;font-weight:600;
   color:var(--oliva);width:auto;flex:1}
 .paso{margin-top:22px}
@@ -1049,14 +1053,37 @@ function profesionalActual(){
   return porLoc[l] || 'MN';
 }
 function cambiarProfesional(){
+  if(typeof ADMIN!=='undefined' && !ADMIN) return;
   const v=document.getElementById('profesional').value;
   const u=new URL(location.href);
   u.searchParams.set('prof',v);
   u.searchParams.delete('loc');
+  if(ADMIN) u.searchParams.set('admin','1');
   location.replace(u.toString());
 }
 const PROF = profesionalActual();
 const LOC  = PROFESIONALES[PROF].loc;
+
+// El selector solo aparece con ?admin=1, que es el enlace del responsable del
+// sistema. Cada profesional entra con su enlace fijo y no puede cambiarse a
+// otra persona ni por descuido ni a propósito.
+const ADMIN = new URLSearchParams(location.search).get('admin')==='1';
+
+function fijarProfesional(){
+  const caja=document.getElementById('cajaLoc');
+  if(!caja) return;
+  const q=PROFESIONALES[PROF];
+  if(ADMIN){
+    const sel=document.getElementById('profesional');
+    if(sel) sel.value=PROF;
+    return;
+  }
+  caja.classList.add('fijo');
+  caja.innerHTML='<label>Profesional</label>'
+    +'<span class="fijo-nombre">'+q.nombre+'</span>'
+    +'<span class="fijo-loc">'+q.localidad+'</span>';
+}
+
 
 
 const val=id=>document.getElementById(id).value.trim();
@@ -2168,7 +2195,7 @@ async function cargarReporte(){
   }
 }
 
-document.getElementById('profesional').value=PROF;
+fijarProfesional();
 (function(){ const f=document.getElementById('fechaApl');
   if(f) f.value=new Date().toISOString().slice(0,10); })();
 cargarInfo();

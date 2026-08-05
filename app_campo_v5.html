@@ -37,6 +37,10 @@ h1{font-size:22px;font-weight:600;letter-spacing:-.02em;margin-top:4px}
 .loc{margin:16px 0 0;background:var(--carta);border:1px solid var(--linea);
   border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px}
 .loc label{margin:0;white-space:nowrap;font-size:10px}
+.loc.fijo{display:block;background:var(--oliva);border-color:var(--oliva);padding:13px 15px}
+.loc.fijo label{color:#9FB09C;display:block;margin-bottom:3px}
+.fijo-nombre{display:block;color:#fff;font-size:16px;font-weight:600;letter-spacing:-.01em}
+.fijo-loc{display:block;color:#C7D3C4;font-size:12.5px;margin-top:2px}
 .loc select{font-size:14px;padding:7px 8px;border:0;background:transparent;font-weight:600;
   color:var(--oliva);width:auto;flex:1}
 .paso{margin-top:24px}
@@ -82,6 +86,10 @@ body.grabando .codigo.listo{background:var(--oliva);color:#fff}
 @keyframes latir{50%{opacity:.25}}
 audio{width:100%;margin-top:12px}
 
+.num-ok{color:var(--apagado)}
+.num-mal{color:var(--senal);font-weight:600;line-height:1.6}
+.num-hueco{color:var(--apagado);line-height:1.9}
+#estadoNum{line-height:1.6}
 .btn-mini{background:var(--oliva);color:#fff;border:0;border-radius:6px;padding:3px 9px;
   font-family:inherit;font-size:11px;font-weight:600;cursor:pointer;margin-left:3px}
 .btn-mini + .btn-mini{background:transparent;color:var(--oliva);border:1px solid var(--linea)}
@@ -164,7 +172,10 @@ body.grabando .subir{background:#1B2027;border-color:#39414B;color:#9AA6B2}
         </div>
         <div class="campo">
           <label for="num" id="lblNum">N° de paciente</label>
-          <input id="num" type="number" inputmode="numeric" min="1" placeholder="1" oninput="pintarCodigo()">
+          <input id="num" type="number" inputmode="numeric" min="1" placeholder="1" oninput="revisarNumero()">
+        </div>
+        <div class="campo ancho" id="cajaEstadoNum">
+          <p class="limite" id="estadoNum"></p>
         </div>
         <div class="campo">
           <label for="sesion">N° de sesión</label>
@@ -253,14 +264,37 @@ function profesionalActual(){
   return porLoc[l] || 'MN';
 }
 function cambiarProfesional(){
+  if(typeof ADMIN!=='undefined' && !ADMIN) return;
   const v=document.getElementById('profesional').value;
   const u=new URL(location.href);
   u.searchParams.set('prof',v);
   u.searchParams.delete('loc');
+  if(ADMIN) u.searchParams.set('admin','1');
   location.replace(u.toString());
 }
 const PROF = profesionalActual();
 const LOC  = PROFESIONALES[PROF].loc;
+
+// El selector solo aparece con ?admin=1, que es el enlace del responsable del
+// sistema. Cada profesional entra con su enlace fijo y no puede cambiarse a
+// otra persona ni por descuido ni a propósito.
+const ADMIN = new URLSearchParams(location.search).get('admin')==='1';
+
+function fijarProfesional(){
+  const caja=document.getElementById('cajaLoc');
+  if(!caja) return;
+  const q=PROFESIONALES[PROF];
+  if(ADMIN){
+    const sel=document.getElementById('profesional');
+    if(sel) sel.value=PROF;
+    return;
+  }
+  caja.classList.add('fijo');
+  caja.innerHTML='<label>Profesional</label>'
+    +'<span class="fijo-nombre">'+q.nombre+'</span>'
+    +'<span class="fijo-loc">'+q.localidad+'</span>';
+}
+
 
 const MAX_SEG=360, HZ=16000;
 
@@ -296,6 +330,9 @@ function ponerModo(m,btn){
   document.getElementById('lblNum').textContent=(m==='TG')?'N° de grupo':'N° de paciente';
   document.getElementById('explica').textContent=TEXTOS[m];
   document.getElementById('ayudaAdj').textContent=AYUDA_ADJ[m];
+  document.getElementById('num').value='';
+  ESTADO_NUM=null;
+  sugerirNumero();
   pintarCodigo();
 }
 
@@ -383,12 +420,52 @@ function pintarCodigo(){
   revisarEnvio();
 }
 
+let ESTADO_NUM=null;
+
 async function sugerirNumero(){
   try{
-    const d=await pedir({accion:'lugarSiguienteNumero',localidad:LOC,tipo:modo});
+    const d=await pedir({accion:'lugarSiguienteNumero',localidad:LOC,tipo:modo,
+                         numero:val('num')||0});
+    ESTADO_NUM=d;
     const el=document.getElementById('num');
-    if(!el.value) el.placeholder=String(d.numero);
+    if(!el.value){ el.placeholder=String(d.siguiente); el.value=String(d.siguiente); }
+    pintarEstadoNum();
+    pintarCodigo();
   }catch(e){}
+}
+
+function pintarEstadoNum(){
+  const caja=document.getElementById('estadoNum');
+  if(!caja || !ESTADO_NUM) return;
+  const d=ESTADO_NUM, n=parseInt(val('num'),10)||0;
+  const que = modo==='TG' ? 'grupo' : 'paciente';
+
+  if(n && d.ocupado===true && n===d.consultado){
+    caja.innerHTML='<span class="num-mal">El '+que+' '+n+' ya existe en esta localidad. '
+      +'El siguiente libre es el <b>'+d.siguiente+'</b> '
+      +'<button class="btn-mini" onclick="tomarNumero('+d.siguiente+')">Usarlo</button></span>';
+    return;
+  }
+  let t='<span class="num-ok">'+d.usados+' '+(modo==='TG'?'grupo(s)':'paciente(s)')
+      +' registrados · el siguiente es el '+d.siguiente+'</span>';
+  if(d.hay_huecos)
+    t+='<br><span class="num-hueco">Números sin usar: '
+      + d.huecos.map(x=>'<button class="btn-mini" onclick="tomarNumero('+x+')">'+x+'</button>').join(' ')
+      + (d.hay_huecos>d.huecos.length?' y '+(d.hay_huecos-d.huecos.length)+' más':'')
+      + '</span>';
+  caja.innerHTML=t;
+}
+
+function tomarNumero(n){
+  document.getElementById('num').value=n;
+  revisarNumero();
+}
+
+let tNum=null;
+function revisarNumero(){
+  pintarCodigo();
+  clearTimeout(tNum);
+  tNum=setTimeout(sugerirNumero, 400);
 }
 
 async function pedir(datos){
@@ -565,13 +642,18 @@ function pesoTotal(){
 
 // ------------------------------------------------------------- enviar
 function revisarEnvio(){
-  const primeraGrupal = modo==='TG' && (parseInt(val('sesion')||'1',10)===1);
+  // solo la sesión 1 crea el caso: en las siguientes el número ya existe
+  const sesion1 = parseInt(val('sesion')||'1',10)===1;
+  const ocupado = sesion1 && ESTADO_NUM && ESTADO_NUM.ocupado
+                  && parseInt(val('num'),10)===ESTADO_NUM.consultado;
+  const primeraGrupal = modo==='TG' && sesion1;
   const hayMaterial = !!wavBlob || ADJUNTOS.length>0;
-  const listo = !!armarCodigo() && hayMaterial && (!primeraGrupal || ADJUNTOS.length>0);
-  document.getElementById('btnEnviar').disabled=!listo;
-
+  const listo = !!armarCodigo() && hayMaterial && !ocupado
+              && (!primeraGrupal || ADJUNTOS.length>0);
   const btn=document.getElementById('btnEnviar');
+  btn.disabled=!listo;
   btn.textContent = !armarCodigo() ? 'Completa el código arriba'
+    : ocupado ? 'Ese número ya está ocupado'
     : (primeraGrupal && !ADJUNTOS.length) ? 'Falta la lista de asistencia'
     : !hayMaterial ? 'Graba la sesión o adjunta tus notas'
     : 'Enviar y generar documento';
@@ -672,7 +754,7 @@ function decir(clase,titulo,texto){
     '<div class="aviso '+clase+'"><b>'+titulo+'</b>'+texto+'</div>';
 }
 
-document.getElementById('profesional').value=PROF;
+fijarProfesional();
 
 // cantones solo en Manabí
 (function(){
@@ -685,7 +767,8 @@ document.getElementById('profesional').value=PROF;
   } else caja.hidden=true;
 })();
 
-document.getElementById('sesion').addEventListener('input',revisarEnvio);
+document.getElementById('sesion').addEventListener('input',function(){
+  revisarEnvio(); sugerirNumero(); });
 document.getElementById('explica').textContent=TEXTOS.TI;
 document.getElementById('ayudaAdj').textContent=AYUDA_ADJ.TI;
 cargarLugares();

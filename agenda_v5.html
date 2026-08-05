@@ -385,14 +385,37 @@ function profesionalActual(){
 }
 function cambiarProfesional(){
   if(typeof SOLO_AGENDA!=='undefined' && SOLO_AGENDA) return;
+  if(typeof ADMIN!=='undefined' && !ADMIN) return;
   const v=document.getElementById('profesional').value;
   const u=new URL(location.href);
   u.searchParams.set('prof',v);
   u.searchParams.delete('loc');
+  if(ADMIN) u.searchParams.set('admin','1');
   location.replace(u.toString());
 }
 const PROF = profesionalActual();
 const LOC  = PROF ? PROFESIONALES[PROF].loc : '';
+
+// El selector solo aparece con ?admin=1, que es el enlace del responsable del
+// sistema. Cada profesional entra con su enlace fijo y no puede cambiarse a
+// otra persona ni por descuido ni a propósito.
+const ADMIN = new URLSearchParams(location.search).get('admin')==='1';
+
+function fijarProfesional(){
+  const caja=document.getElementById('cajaLoc');
+  if(!caja || !PROF) return;
+  const q=PROFESIONALES[PROF];
+  if(ADMIN){
+    const sel=document.getElementById('profesional');
+    if(sel) sel.value=PROF;
+    return;
+  }
+  caja.classList.add('fijo');
+  caja.innerHTML='<label>Profesional</label>'
+    +'<span class="fijo-nombre">'+q.nombre+'</span>'
+    +'<span class="fijo-loc">'+q.localidad+'</span>';
+}
+
 // ?solo=1 → enlace para quien agenda desde territorio.
 // Queda fijo en un solo profesional: no se puede cambiar ni ver el de nadie más,
 // para que no haya equivocaciones en campo.
@@ -406,7 +429,7 @@ if(SOLO_AGENDA){
     +'<span class="fijo-nombre">'+PROFESIONALES[PROF].nombre+'</span>'
     +'<span class="fijo-loc">'+PROFESIONALES[PROF].localidad+'</span>';
 }else{
-  document.getElementById('profesional').value=PROF;
+  fijarProfesional();
 }
 
 const val=id=>document.getElementById(id).value.trim();
@@ -533,7 +556,7 @@ async function pararDictado(){
   document.getElementById('dicCargando').classList.add('on');
   try{
     const audio=await dicBase64(wav);
-    const d=await pedir({accion:'agendaDictar',audio:audio,audioMime:'audio/wav',localidad:LOC});
+    const d=await pedir({accion:'agendaDictar',audio:audio,audioMime:'audio/wav',profesional:PROF});
     document.getElementById('dicCargando').classList.remove('on');
     mostrarPropuestas(d);
   }catch(e){
@@ -639,7 +662,7 @@ async function guardar(forzar){
       cuando:val('fecha')+'T'+val('hora'),
       duracion:val('duracion'), modalidad:val('modalidad'),
       lugar:val('lugar'), motivo:val('motivo'),
-      atencion:val('atencion'), profesional:PROF, localidad:LOC,
+      atencion:val('atencion'), profesional:PROF,
       forzar: forzar ? 'si' : ''
     });
     document.getElementById('cargando').classList.remove('on');
@@ -846,7 +869,7 @@ async function listar(){
   const caja=document.getElementById('listaSalida');
   caja.innerHTML='<div class="cargando on">Cargando…</div>';
   try{
-    const d=await pedir({accion:'agendaListar',filtro:val('filtro'),dias:'60',localidad:LOC});
+    const d=await pedir({accion:'agendaListar',filtro:val('filtro'),dias:'60',profesional:PROF});
     if(!d.citas.length){
       caja.innerHTML='<div class="aviso neutro"><b>Sin citas</b>'
         +'No hay citas en los próximos 60 días con ese filtro.</div>';
