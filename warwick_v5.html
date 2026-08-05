@@ -1985,7 +1985,9 @@ async function pdfADrive(){
 
   if(guardados.length){
     caja.innerHTML='<div class="aviso ok"><b>'+guardados.length+' archivo(s) en Drive</b>'
-      + guardados.map(g=>esc(g.archivo)).join('<br>')
+      + guardados.map(g=>esc(g.archivo)
+          + (g.tamano ? ' <span style="color:var(--apagado)">('
+              + Math.round(g.tamano/1024) + ' KB)</span>' : '')).join('<br>')
       + '<p style="margin-top:9px"><a href="'+esc(guardados[0].carpeta)+'" target="_blank" '
       + 'rel="noopener">Abrir la carpeta del caso</a></p></div>'
       + (fallos.length?'<div class="aviso neutro" style="margin-top:8px"><b>'+fallos.length
@@ -2013,9 +2015,18 @@ async function pdfADrive(){
  * Google convierte el HTML directamente y no depende de eso.
  */
 function hojaAHtml(nodo){
+  if(!nodo || !nodo.outerHTML || nodo.outerHTML.length < 200)
+    throw new Error('la hoja está vacía: ábrela primero y vuelve a intentar');
+
+  // El conversor de Google no entiende @page: se cambia por márgenes del body.
+  const estilo = estiloHoja()
+    .replace(/@page\{[^}]*\}/, '')
+    + 'body{margin:10mm 11mm;width:auto}';
+
   const doc = '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">'
-    + '<style>' + estiloHoja() + '</style></head><body>'
+    + '<style>' + estilo + '</style></head><body>'
     + nodo.outerHTML + '</body></html>';
+
   // a base64 conservando las tildes
   return btoa(unescape(encodeURIComponent(doc)));
 }
