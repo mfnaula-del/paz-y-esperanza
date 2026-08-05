@@ -377,6 +377,12 @@ if (typeof html2pdf === 'undefined') {
     <section class="paso" id="secGuardar" hidden>
       <div class="paso-cabeza"><span class="paso-num">03</span><span class="paso-titulo">Guardar</span></div>
       <div class="carta">
+        <label for="fechaApl">Fecha de aplicación</label>
+        <input id="fechaApl" type="date">
+        <p class="ayuda" style="font-size:11.5px;color:var(--apagado);margin:6px 0 14px;
+           line-height:1.45">Si la escala se aplicó en papel hace días, pon la fecha real:
+           es la que va al reporte, no la de hoy.</p>
+
         <label for="obs">Observaciones (opcional)</label>
         <textarea id="obs" placeholder="Notas del aplicador"></textarea>
         <button class="btn btn-enviar" id="btnGuardar" onclick="guardar()" disabled>Guardar aplicación</button>
@@ -1392,9 +1398,11 @@ async function guardar(){
   document.getElementById('salida').innerHTML='';
   document.getElementById('btnGuardar').disabled=true;
   try{
-    const d=await pedir({accion:'guardarTest',codigo:PERSONA.codigo,nombre:PERSONA.nombre,
+    const d=await pedir({accion:'guardarTest',profesional:PROF,
+      codigo:PERSONA.codigo,nombre:PERSONA.nombre,
       edad:PERSONA.edad,genero:PERSONA.genero||'',vbg:PERSONA.vbg||'',
       discapacidad:PERSONA.discapacidad||'',momento:MOMENTO,
+      fecha:val('fechaApl')||'',
       respuestas:JSON.stringify(respuestas),observaciones:val('obs')});
     document.getElementById('cargando').classList.remove('on');
 
@@ -1968,9 +1976,9 @@ async function pdfADrive(){
     try{
       caja.innerHTML='<div class="aviso neutro"><b>Generando '+(i+1)+' de '+hojas.length+'…</b>'
         +'No cierres la pestaña.</div>';
-      const b64 = await hojaAPdf(hojas[i]);
-      const r = await pedir({accion:'guardarPdf', codigo:d.codigo, nombre:d.nombre,
-                             momento:momento, pdf:b64});
+      const html = hojaAHtml(hojas[i]);
+      const r = await pedir({accion:'guardarHtml', codigo:d.codigo, nombre:d.nombre,
+                             momento:momento, html:html});
       guardados.push(r);
     }catch(e){ fallos.push(momento+': '+e.message); }
   }
@@ -1995,85 +2003,23 @@ async function pdfADrive(){
  * para que el PDF de Drive salga idéntico al papel. Si se generara desde la
  * pantalla directamente, arrastraría el CSS de la aplicación y quedaría distinto.
  */
-function hojaAPdf(nodo){
-  if(typeof html2pdf==='undefined')
-    return Promise.reject(new Error('el generador de PDF no cargó. Recarga la página con '
-      + 'Ctrl+F5; si sigue igual, puede ser la conexión o un bloqueador de scripts'));
-
-  // La copia se mete en un contenedor visible pero fuera de la vista, y los
-  // estilos se aplican elemento por elemento. Con un <style> dentro de un div
-  // o dentro de un iframe el generador los ignoraba y el PDF salía en blanco.
-  const caja = document.createElement('div');
-  caja.className = 'pdf-caja';
-  caja.style.cssText = 'position:absolute;left:0;top:0;z-index:-1;opacity:0;'
-    + 'width:718px;background:#fff;padding:0;margin:0';
-
-  const copia = nodo.cloneNode(true);
-  caja.appendChild(copia);
-  document.body.appendChild(caja);
-  aplicarEstiloPdf(caja);
-
-  const limpiar = () => { try{ document.body.removeChild(caja); }catch(e){} };
-
-  return html2pdf().set({
-      margin: [10,11,10,11],
-      image: {type:'jpeg', quality:0.96},
-      html2canvas: {scale:2, useCORS:true, backgroundColor:'#ffffff'},
-      jsPDF: {unit:'mm', format:'a4', orientation:'portrait'},
-      pagebreak: {mode:['css','legacy']}
-    }).from(copia).outputPdf('datauristring')
-      .then(uri => { limpiar(); return uri.split(',')[1]; })
-      .catch(e => { limpiar(); throw e; });
-}
-
 /**
- * Aplica el formato del papel a cada elemento de la copia.
+ * Arma el HTML completo de la hoja, con sus estilos dentro, y lo devuelve en
+ * base64 para que el servidor lo convierta en PDF.
  *
- * Va uno por uno en vez de usar una hoja de estilos porque el generador de
- * imágenes solo lee los estilos que están en el atributo style del elemento.
- * Las medidas son las mismas de estiloHoja(), en píxeles a 96 ppp.
+ * La conversión ya no se hace en el navegador: se intentó tres veces con
+ * generadores del lado del cliente y el archivo siempre salía en blanco,
+ * porque capturan antes de que el navegador termine de aplicar los estilos.
+ * Google convierte el HTML directamente y no depende de eso.
  */
-function aplicarEstiloPdf(raiz){
-  const S = (sel, css) => raiz.querySelectorAll(sel).forEach(e => e.style.cssText += ';' + css);
-
-  raiz.style.cssText += ';font-family:Georgia,"Times New Roman",serif;font-size:12.7px;'
-    + 'color:#111;line-height:1.32';
-  S('.hoja', 'padding:0;margin:0;border:0;background:#fff');
-  S('.logos', 'display:flex;justify-content:center;align-items:center;gap:20px;margin:0 0 8px');
-  S('.logos img', 'max-height:48px;max-width:30%;object-fit:contain');
-  S('h2', 'color:#1F3864;font-size:15.3px;text-align:center;line-height:1.25;'
-        + 'margin:0 0 3px;font-weight:700');
-  S('.sub1', 'text-align:center;font-style:italic;font-size:12px;margin:0 0 1px');
-  S('.sub2', 'text-align:center;font-size:11.3px;color:#555;margin:0 0 7px');
-  S('h3', 'color:#1F3864;font-size:12.7px;font-weight:700;margin:9px 0 3px');
-  S('p', 'margin:0 0 4px');
-  S('table.of', 'width:100%;border-collapse:collapse;margin:3px 0;font-size:11.3px');
-  S('table.of th, table.of td',
-    'border:1px solid #9aa5b1;padding:3px 5px;vertical-align:middle;text-align:center');
-  S('table.of th', 'background:#1F3864;color:#fff;font-size:10px;font-weight:600;line-height:1.2');
-  S('table.of th.izq, table.of td.izq', 'text-align:left');
-  S('table.of td.et', 'background:#E8EDF5;font-weight:600;text-align:left;width:26%');
-  S('table.of tbody tr:nth-child(even)', 'background:#F2F4F7');
-  S('.cb', 'font-size:14px;line-height:1');
-  S('.puntaje td', 'font-size:12px');
-  S('.obs', 'border:1px solid #9aa5b1;min-height:40px;margin-top:3px');
-  S('.comparativa', 'border:1px solid #1F3864;border-radius:4px;padding:7px 9px;margin-top:7px');
-  S('.comparativa h3', 'margin-top:0');
-  S('.pill', 'display:inline-block;padding:1px 9px;border:1px solid #999;'
-           + 'border-radius:20px;font-size:11.3px;font-weight:700');
-  S('.firmas', 'margin-top:22px;display:flex;gap:30px;align-items:flex-end');
-  S('.firma-bloque', 'flex:1');
-  S('.firma-linea', 'border-bottom:1px solid #000;height:45px;position:relative');
-  S('.firma-img', 'position:absolute;bottom:1px;left:6px;height:40px;width:auto');
-  S('.firma-rot', 'font-size:10px;color:#444;margin-top:3px;line-height:1.3');
-  S('.firma-rot b', 'display:block;font-size:11.3px;color:#000;font-weight:600');
-  S('.nota-metodo', 'background:#F6F7F9;border-left:3px solid #1F3864;padding:5px 8px;'
-                  + 'font-size:9.3px;line-height:1.35;margin-top:6px');
-  S('.marca', 'display:inline-block;width:11px;height:11px;border:1px solid #000;'
-            + 'border-radius:2px;vertical-align:-1px');
-  S('.marca.on', 'background:#000');
-  S('.no-imprimir', 'display:none');
+function hojaAHtml(nodo){
+  const doc = '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">'
+    + '<style>' + estiloHoja() + '</style></head><body>'
+    + nodo.outerHTML + '</body></html>';
+  // a base64 conservando las tildes
+  return btoa(unescape(encodeURIComponent(doc)));
 }
+
 
 
 
@@ -2210,6 +2156,8 @@ async function cargarReporte(){
 }
 
 document.getElementById('profesional').value=PROF;
+(function(){ const f=document.getElementById('fechaApl');
+  if(f) f.value=new Date().toISOString().slice(0,10); })();
 cargarInfo();
 hacerBusqueda('');
 </script>

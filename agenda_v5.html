@@ -129,6 +129,9 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 .hueco:hover{border-color:var(--oliva)}
 .forzar{background:none;border:0;color:var(--ambar);font-family:inherit;font-size:12px;
   text-decoration:underline;cursor:pointer;margin-top:10px;padding:0}
+.reag-tit{font-size:15px;font-weight:600}
+.reag-sub{font-size:12.5px;color:var(--apagado);margin-top:3px}
+#reagSeccion .chip{margin:4px 4px 0 0}
 .nav-semana{display:flex;align-items:center;gap:10px;justify-content:space-between}
 .nav-semana button{width:38px;height:38px;border:1px solid var(--linea);background:#FBFBFA;
   border-radius:9px;font-size:19px;color:var(--oliva);cursor:pointer;line-height:1}
@@ -322,6 +325,11 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
     </section>
     <div id="listaSalida" style="margin-top:16px"></div>
   </div>
+
+  <section class="paso" id="reagSeccion" hidden>
+    <div class="paso-cabeza"><span class="paso-num">↻</span><span class="paso-titulo">Reagendar</span></div>
+    <div id="reagCaja"></div>
+  </section>
 
   <!-- ================= HORARIO ================= -->
   <div class="vista" id="v-horario">
@@ -864,6 +872,7 @@ function dibujar(c){
     ? '<div class="acciones">'
       + '<button class="si" onclick="marcar('+c.fila+',\'Atendida\')">Atendió</button>'
       + '<button class="no" onclick="marcar('+c.fila+',\'No asistió\')">No asistió</button>'
+      + '<button onclick="reagendar('+c.fila+')">Reagendar</button>'
       + '<button onclick="marcar('+c.fila+',\'Cancelada\')">Cancelar</button>'
       + '</div>' : '';
 
@@ -879,9 +888,99 @@ function dibujar(c){
     + etq + acciones + '</div>';
 }
 
+
+// ---------------------------------------------------------- reagendar
+let REAG = null;
+
+function reagendar(fila){
+  const c = (window.CITAS||[]).filter(x=>x.fila===fila)[0];
+  if(!c) return;
+  REAG = c;
+  const hoy = new Date().toISOString().slice(0,10);
+  document.getElementById('reagCaja').innerHTML =
+      '<div class="carta">'
+    + '<p class="reag-tit">Mover la cita de <b>'+esc(c.nombre)+'</b></p>'
+    + '<p class="reag-sub">Ahora: '+esc(c.dia)+' '+esc(c.cuando)+'</p>'
+    + '<div class="rejilla" style="margin-top:12px">'
+    +   '<div class="campo"><label for="reagFecha">Nuevo día</label>'
+    +     '<input id="reagFecha" type="date" value="'+hoy+'" onchange="reagDia()"></div>'
+    +   '<div class="campo"><label for="reagHora">Hora</label>'
+    +     '<input id="reagHora" type="time" value="'+esc(c.cuando.slice(11,16)||'09:00')+'"></div>'
+    +   '<div class="campo ancho"><label for="reagDur">Duración (min)</label>'
+    +     '<input id="reagDur" type="number" min="15" step="15" value="'+(c.duracion||60)+'"></div>'
+    + '</div>'
+    + '<div id="reagDispo"></div>'
+    + '<button class="btn btn-enviar" onclick="reagGuardar()">Mover la cita</button>'
+    + '<button class="btn btn-suave" onclick="reagCerrar()">Dejarla como está</button>'
+    + '<div id="reagSalida"></div>'
+    + '</div>';
+  document.getElementById('reagSeccion').hidden = false;
+  document.getElementById('reagSeccion').scrollIntoView({behavior:'smooth',block:'center'});
+  reagDia();
+}
+
+function reagCerrar(){
+  REAG = null;
+  document.getElementById('reagSeccion').hidden = true;
+  document.getElementById('reagCaja').innerHTML = '';
+}
+
+async function reagDia(){
+  const f = val('reagFecha');
+  const caja = document.getElementById('reagDispo');
+  if(!f || !caja) return;
+  try{
+    const d = await pedir({accion:'agendaDia',profesional:PROF,fecha:f});
+    if(!d.disponibilidad){ caja.innerHTML=''; return; }
+    const x = d.disponibilidad;
+    caja.innerHTML = '<div class="dispo'+(x.especial?' especial':'')+'">'
+      + '<b>'+esc(x.dia)+' '+esc(x.fecha)+' · '+esc(x.lugar)+'</b>'+esc(x.nota)+'</div>';
+  }catch(e){ caja.innerHTML=''; }
+}
+
+async function reagGuardar(forzar){
+  if(!REAG) return;
+  const f = val('reagFecha'), h = val('reagHora');
+  if(!f || !h) return;
+  const salida = document.getElementById('reagSalida');
+  salida.innerHTML = '<div class="aviso neutro">Moviendo…</div>';
+  try{
+    const d = await pedir({accion:'agendaMover', profesional:PROF, fila:REAG.fila,
+      cuando:f+'T'+h, duracion:val('reagDur')||'60', forzar: forzar?'si':''});
+
+    if(!d.creada){
+      salida.innerHTML = '<div class="aviso neutro"><b>'+esc(d.mensaje)+'</b>'
+        + d.choques.map(x=>esc(x.nombre)+' · '+esc(x.cuando)).join('<br>')
+        + (d.sugerencias&&d.sugerencias.length
+           ? '<p style="margin-top:9px">Huecos libres:</p>'
+             + d.sugerencias.map(s=>'<button class="chip" onclick="reagTomar(\''+s.iso+'\')">'
+                 +esc(s.texto)+'</button>').join(' ')
+           : '')
+        + '<button class="btn btn-suave" onclick="reagGuardar(true)">'
+        + 'Moverla igual, aunque coincida</button></div>';
+      return;
+    }
+    salida.innerHTML = '<div class="aviso ok"><b>Cita movida</b>'
+      + esc(d.nombre)+'<br>Antes: '+esc(d.antes)+'<br>Ahora: '+esc(d.ahora)
+      + (d.forzada?'<br>Coincide con otra cita.':'')
+      + (d.disponibilidad&&d.disponibilidad.especial
+         ? '<br>Ese día hay salida a comunidad.':'')+'</div>';
+    setTimeout(()=>{ reagCerrar(); listar(); }, 1600);
+  }catch(e){
+    salida.innerHTML = '<div class="aviso error"><b>No se pudo mover</b>'+esc(e.message)+'</div>';
+  }
+}
+
+function reagTomar(iso){
+  document.getElementById('reagFecha').value = iso.slice(0,10);
+  document.getElementById('reagHora').value  = iso.slice(11,16);
+  reagDia();
+  reagGuardar();
+}
+
 async function marcar(fila,estado){
   try{
-    await pedir({accion:'agendaEstado',fila:fila,estado:estado,localidad:LOC});
+    await pedir({accion:'agendaEstado',fila:fila,estado:estado,profesional:PROF});
     listar();
   }catch(e){
     document.getElementById('listaSalida').insertAdjacentHTML('afterbegin',
