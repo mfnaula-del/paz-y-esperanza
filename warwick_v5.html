@@ -2000,24 +2000,46 @@ function hojaAPdf(nodo){
     return Promise.reject(new Error('el generador de PDF no cargó. Recarga la página con '
       + 'Ctrl+F5; si sigue igual, puede ser la conexión o un bloqueador de scripts'));
 
-  const caja = document.createElement('div');
-  caja.style.cssText = 'position:fixed;left:-10000px;top:0;width:190mm;background:#fff';
-  const est = document.createElement('style');
-  est.textContent = estiloHoja().replace('@page{size:A4;margin:10mm 11mm}', '');
-  caja.appendChild(est);
-  const copia = nodo.cloneNode(true);
-  caja.appendChild(copia);
-  document.body.appendChild(caja);
+  // El estilo se aplica dentro de un iframe con su propia hoja de estilos.
+  // Meter un <style> dentro de un div no funciona: html2canvas lo ignora y el
+  // PDF salía con el aspecto de la pantalla en vez del formato del papel.
+  const marco = document.createElement('iframe');
+  marco.style.cssText = 'position:fixed;left:-10000px;top:0;width:800px;height:1200px;border:0';
+  document.body.appendChild(marco);
 
-  return html2pdf().set({
+  const doc = marco.contentDocument;
+  doc.open();
+  doc.write('<!DOCTYPE html><html><head><meta charset="utf-8"><style>'
+    + estiloHoja().replace('@page{size:A4;margin:10mm 11mm}', '')
+    + 'body{width:190mm;margin:0;padding:0}'
+    + '</style></head><body>' + nodo.outerHTML + '</body></html>');
+  doc.close();
+
+  const caja = doc.body;
+  const limpiar = () => { try{ document.body.removeChild(marco); }catch(e){} };
+
+  // esperar a que los logos terminen de cargar dentro del marco
+  const listo = new Promise(ok => {
+    const imgs = [...doc.images];
+    if(!imgs.length) return ok();
+    let n = imgs.length;
+    const fin = () => { if(--n <= 0) ok(); };
+    imgs.forEach(i => { if(i.complete) fin();
+      else { i.onload = fin; i.onerror = fin; } });
+    setTimeout(ok, 2500);
+  });
+
+  return listo.then(() => html2pdf().set({
       margin: [10,11,10,11],
       image: {type:'jpeg', quality:0.96},
-      html2canvas: {scale:2, useCORS:true, backgroundColor:'#ffffff', windowWidth:760},
+      // 190 mm son los 210 del A4 menos los márgenes; a 96 ppp son 718 px
+      html2canvas: {scale:2, useCORS:true, backgroundColor:'#ffffff',
+                    windowWidth:718, width:718},
       jsPDF: {unit:'mm', format:'a4', orientation:'portrait'},
       pagebreak: {mode:['css','legacy']}
-    }).from(caja).outputPdf('datauristring')
-      .then(uri => { document.body.removeChild(caja); return uri.split(',')[1]; })
-      .catch(e => { try{ document.body.removeChild(caja); }catch(x){} throw e; });
+    }).from(caja).outputPdf('datauristring'))
+      .then(uri => { limpiar(); return uri.split(',')[1]; })
+      .catch(e => { limpiar(); throw e; });
 }
 
 
