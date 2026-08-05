@@ -234,8 +234,11 @@ table.of td.c{text-align:center;width:11%}
 
 @media print{
   @page{size:A4;margin:12mm}
-  body{background:#fff;padding:0;font-size:10.5pt}
-  .envoltura{max-width:none}
+  /* min-height:100dvh es del viewport de pantalla; al imprimir generaba una
+     página entera en blanco antes del contenido. */
+  html, body{background:#fff!important;padding:0!important;margin:0!important;
+    min-height:0!important;height:auto!important;font-size:10.5pt}
+  .envoltura{max-width:none;margin:0;padding:0}
 
   /* lo que solo sirve en pantalla */
   .no-imprimir, .oculto-print{display:none!important}
@@ -1429,7 +1432,7 @@ async function elegirFicha(i){
     if(d.post) html+=hojaOficial(d,'post');
     if(d.pre&&d.post) html+=hojaComparativa(d);
     html+='<div class="acciones-ficha no-imprimir">'
-      +'<button class="btn btn-tinta" onclick="window.print()">Imprimir</button>'
+      +'<button class="btn btn-tinta" onclick="imprimirHojas(\'fichaSalida\')">Imprimir</button>'
       +'<button class="btn btn-enviar" onclick="pdfADrive()">Guardar en Drive</button>'
       +'</div><div id="pdfSalida" class="no-imprimir"></div>';
     window.FICHA=d;
@@ -1877,7 +1880,7 @@ async function gImprimirBlanco(){
       '<div class="aviso neutro"><b>'+d.imprimibles+' hojas listas</b>'
       +d.excluidos+' participante(s) quedaron fuera por ser menores de '+d.edad_minima
       +' años.</div>';
-    setTimeout(()=>window.print(), 400);
+    setTimeout(()=>imprimirHojas('gImpresion'), 400);
   }catch(e){
     cg.classList.remove('on');
     document.getElementById('gAviso').innerHTML=
@@ -1973,18 +1976,114 @@ async function pdfADrive(){
   }
 }
 
-/** Convierte una hoja de la pantalla en PDF A4, y lo devuelve en base64. */
+/**
+ * Convierte una hoja en PDF A4 y lo devuelve en base64.
+ *
+ * Se copia la hoja a un contenedor propio con el MISMO estilo de imprimirHojas(),
+ * para que el PDF de Drive salga idéntico al papel. Si se generara desde la
+ * pantalla directamente, arrastraría el CSS de la aplicación y quedaría distinto.
+ */
 function hojaAPdf(nodo){
   if(typeof html2pdf==='undefined')
     return Promise.reject(new Error('el generador de PDF no cargó. Recarga la página con '
       + 'Ctrl+F5; si sigue igual, puede ser la conexión o un bloqueador de scripts'));
+
+  const caja = document.createElement('div');
+  caja.style.cssText = 'position:fixed;left:-10000px;top:0;width:190mm;background:#fff';
+  const est = document.createElement('style');
+  est.textContent = estiloHoja().replace('@page{size:A4;margin:10mm 11mm}', '');
+  caja.appendChild(est);
+  const copia = nodo.cloneNode(true);
+  caja.appendChild(copia);
+  document.body.appendChild(caja);
+
   return html2pdf().set({
-      margin: [10,10,10,10],
-      image: {type:'jpeg', quality:0.95},
-      html2canvas: {scale:2, useCORS:true, backgroundColor:'#ffffff'},
-      jsPDF: {unit:'mm', format:'a4', orientation:'portrait'}
-    }).from(nodo).outputPdf('datauristring')
-      .then(uri => uri.split(',')[1]);
+      margin: [10,11,10,11],
+      image: {type:'jpeg', quality:0.96},
+      html2canvas: {scale:2, useCORS:true, backgroundColor:'#ffffff', windowWidth:760},
+      jsPDF: {unit:'mm', format:'a4', orientation:'portrait'},
+      pagebreak: {mode:['css','legacy']}
+    }).from(caja).outputPdf('datauristring')
+      .then(uri => { document.body.removeChild(caja); return uri.split(',')[1]; })
+      .catch(e => { try{ document.body.removeChild(caja); }catch(x){} throw e; });
+}
+
+
+// ============================================================================
+//  IMPRIMIR
+//  Se abre una ventana nueva solo con las hojas y su estilo. Antes se imprimía
+//  la página entera y el navegador tenía que ignorar todo lo demás; bastaba una
+//  regla de más para que saliera en blanco. Así no hay nada que ocultar.
+// ============================================================================
+
+function estiloHoja(){
+  // Medidas ajustadas para que la ficha entre en UNA hoja A4 con holgura,
+  // incluso con nombres largos u observaciones de varias líneas.
+  return '@page{size:A4;margin:10mm 11mm}'
+  + '*{box-sizing:border-box}'
+  + 'body{font-family:Georgia,"Times New Roman",serif;font-size:9.5pt;color:#111;'
+  +   'background:#fff;margin:0;padding:0;line-height:1.32}'
+  + '.hoja{padding:0;margin:0}'
+  + '.hoja + .hoja{page-break-before:always}'
+  + '.logos{display:flex;justify-content:center;align-items:center;gap:20px;'
+  +   'margin-bottom:8px}'
+  + '.logos img{max-height:36px;max-width:30%;object-fit:contain}'
+  + 'h2{color:#1F3864;font-size:11.5pt;text-align:center;line-height:1.25;margin:0 0 3px;'
+  +   'font-weight:700;letter-spacing:.01em}'
+  + '.sub1{text-align:center;font-style:italic;font-size:9pt;margin:0 0 1px}'
+  + '.sub2{text-align:center;font-size:8.5pt;color:#555;margin:0 0 7px}'
+  + 'h3{color:#1F3864;font-size:9.5pt;font-weight:700;margin:9px 0 3px}'
+  + 'p{margin:0 0 4px}'
+  + 'table.of{width:100%;border-collapse:collapse;margin:3px 0;font-size:8.5pt}'
+  + 'table.of th,table.of td{border:1px solid #9aa5b1;padding:3px 5px;'
+  +   'vertical-align:middle;text-align:center}'
+  + 'table.of th{background:#1F3864;color:#fff;font-size:7.5pt;font-weight:600;'
+  +   'line-height:1.2;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+  + 'table.of th.izq,table.of td.izq{text-align:left}'
+  + 'table.of td.et{background:#E8EDF5;font-weight:600;text-align:left;width:26%;'
+  +   '-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+  + 'table.of tbody tr:nth-child(even){background:#F2F4F7;'
+  +   '-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+  + 'table.of tr{page-break-inside:avoid}'
+  + '.cb{font-size:10.5pt;line-height:1}'
+  + '.puntaje td{font-size:9pt}'
+  + '.obs{border:1px solid #9aa5b1;min-height:30px;margin-top:3px}'
+  + '.comparativa{border:1px solid #1F3864;border-radius:4px;padding:7px 9px;margin-top:7px}'
+  + '.comparativa h3{margin-top:0}'
+  + '.pill{display:inline-block;padding:1px 9px;border:1px solid #999;border-radius:20px;'
+  +   'font-size:8.5pt;font-weight:700}'
+  + '.firmas{margin-top:22px;display:flex;gap:30px;align-items:flex-end}'
+  + '.firma-bloque{flex:1}'
+  + '.firma-linea{border-bottom:1px solid #000;height:34px}'
+  + '.firma-rot{font-size:7.5pt;color:#444;margin-top:3px;line-height:1.3}'
+  + '.firma-rot b{display:block;font-size:8.5pt;color:#000;font-weight:600}'
+  + '.nota-metodo{background:#F6F7F9;border-left:3px solid #1F3864;padding:5px 8px;'
+  +   'font-size:7pt;line-height:1.35;margin-top:6px;'
+  +   '-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+  + '.marca{display:inline-block;width:11px;height:11px;border:1px solid #000;'
+  +   'border-radius:2px;vertical-align:-1px}'
+  + '.marca.on{background:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}';
+}
+
+/** Abre las hojas en una ventana limpia y lanza la impresión. */
+function imprimirHojas(contenedor){
+  const nodo = document.getElementById(contenedor || 'fichaSalida');
+  const hojas = nodo ? nodo.querySelectorAll('.hoja') : [];
+  if(!hojas.length){ alert('No hay ninguna hoja que imprimir todavía.'); return; }
+
+  let cuerpo = '';
+  hojas.forEach(x => { cuerpo += x.outerHTML; });
+
+  const v = window.open('', '_blank');
+  if(!v){ alert('El navegador bloqueó la ventana. Permite las ventanas emergentes de este sitio y vuelve a intentar.'); return; }
+  v.document.open();
+  v.document.write('<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">'
+    + '<title>Escala Warwick · Paz y Esperanza</title>'
+    + '<style>' + estiloHoja() + '</style></head><body>' + cuerpo + '</body></html>');
+  v.document.close();
+  // esperar a que carguen los logos antes de abrir el diálogo
+  v.onload = () => { setTimeout(() => { v.focus(); v.print(); }, 350); };
+  setTimeout(() => { try{ v.focus(); v.print(); }catch(e){} }, 900);
 }
 
 // ---------------------------------------------------------- reporte
@@ -2035,7 +2134,7 @@ async function cargarReporte(){
       +   d.umbral+' puntos brutos.'
       + '</div>'
       + bloqueFirmas(d.profesional||d.institucion)+'</div>'
-      + '<button class="btn btn-tinta no-imprimir" onclick="window.print()">Imprimir reporte</button>';
+      + '<button class="btn btn-tinta no-imprimir" onclick="imprimirHojas(\'reporteSalida\')">Imprimir reporte</button>';
   }catch(e){
     caja.innerHTML='<div class="aviso error"><b>Error</b>'+esc(e.message)+'</div>';
   }
