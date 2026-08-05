@@ -134,7 +134,8 @@ table.of td.c{text-align:center;width:11%}
 .obs{border:1px solid #9aa5b1;min-height:44px;padding:6px;margin-top:4px;font-size:11px}
 .firmas{margin-top:38px;display:flex;gap:34px;flex-wrap:wrap;align-items:flex-end}
 .firma-bloque{flex:1;min-width:210px}
-.firma-linea{border-bottom:1px solid #000;height:46px}
+.firma-linea{border-bottom:1px solid #000;height:46px;position:relative}
+.firma-img{position:absolute;bottom:2px;left:8px;height:40px;width:auto}
 .firma-rot{font-size:10px;color:#444;margin-top:5px;line-height:1.35}
 .firma-rot b{display:block;font-size:11px;color:#000;font-weight:600}
 .comparativa{margin-top:18px;border:1.5px solid var(--azul);border-radius:6px;padding:12px}
@@ -1427,6 +1428,11 @@ async function elegirFicha(i){
   caja.innerHTML='<div class="cargando on">Abriendo…</div>';
   try{
     const d=await pedir({accion:'ficha',codigo:p.codigo,nombre:p.nombre});
+    // la firma de quien aplicó, si la tiene cargada
+    if(d.aplicador_clave){
+      try{ const f=await pedir({accion:'firma',clave:d.aplicador_clave});
+           d.__firma=f.firma; }catch(e){}
+    }
     let html='';
     if(d.pre)  html+=hojaOficial(d,'pre');
     if(d.post) html+=hojaOficial(d,'post');
@@ -1505,16 +1511,22 @@ function hojaOficial(d,momento){
   + '<p style="margin-top:12px"><b>Observaciones:</b></p>'
   + '<div class="obs">'+esc(r.observaciones||'')+'</div>'
 
-  + bloqueFirmas(d.aplicador)
+  + bloqueFirmas(d.aplicador, d.__firma)
   + '</div>';
 }
 
-/** Dos espacios de firma con altura suficiente para firmar a mano. */
-function bloqueFirmas(aplicador){
+/**
+ * Dos espacios de firma. Si la profesional tiene su firma cargada, se dibuja
+ * encima de la línea; si no, queda el espacio en blanco para firmar a mano.
+ */
+function bloqueFirmas(aplicador, firma){
+  const img = firma && firma.datos
+    ? '<img src="data:image/png;base64,'+firma.datos+'" class="firma-img" alt="">'
+    : '';
   return '<div class="firmas">'
     + '<div class="firma-bloque"><div class="firma-linea"></div>'
     +   '<div class="firma-rot"><b>'+esc(aplicador||'')+'</b>Nombre del/la aplicador/a</div></div>'
-    + '<div class="firma-bloque"><div class="firma-linea"></div>'
+    + '<div class="firma-bloque"><div class="firma-linea">'+img+'</div>'
     +   '<div class="firma-rot"><b>&nbsp;</b>Firma</div></div>'
     + '</div>';
 }
@@ -1554,7 +1566,7 @@ function hojaComparativa(d){
   + '<div class="comparativa"><h3>INTERPRETACIÓN</h3>'
   +   '<p><span class="pill '+cl+'">'+esc(d.tendencia)+'</span></p>'
   +   '<p style="margin-top:8px">'+esc(d.frase)+'</p></div>'
-  + bloqueFirmas(d.aplicador)
+  + bloqueFirmas(d.aplicador, d.__firma)
   + '</div>';
 }
 
@@ -2054,7 +2066,8 @@ function estiloHoja(){
   +   'font-size:8.5pt;font-weight:700}'
   + '.firmas{margin-top:22px;display:flex;gap:30px;align-items:flex-end}'
   + '.firma-bloque{flex:1}'
-  + '.firma-linea{border-bottom:1px solid #000;height:34px}'
+  + '.firma-linea{border-bottom:1px solid #000;height:34px;position:relative}'
+  + '.firma-img{position:absolute;bottom:1px;left:6px;height:30px;width:auto}'
   + '.firma-rot{font-size:7.5pt;color:#444;margin-top:3px;line-height:1.3}'
   + '.firma-rot b{display:block;font-size:8.5pt;color:#000;font-weight:600}'
   + '.nota-metodo{background:#F6F7F9;border-left:3px solid #1F3864;padding:5px 8px;'
@@ -2133,7 +2146,7 @@ async function cargarReporte(){
       +   'quienes tienen ambas mediciones registradas. El umbral de cambio relevante es de '
       +   d.umbral+' puntos brutos.'
       + '</div>'
-      + bloqueFirmas(d.profesional||d.institucion)+'</div>'
+      + bloqueFirmas(d.profesional||d.institucion, d.__firma)+'</div>'
       + '<button class="btn btn-tinta no-imprimir" onclick="imprimirHojas(\'reporteSalida\')">Imprimir reporte</button>';
   }catch(e){
     caja.innerHTML='<div class="aviso error"><b>Error</b>'+esc(e.message)+'</div>';
