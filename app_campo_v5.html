@@ -239,7 +239,19 @@ body.grabando .subir{background:#1B2027;border-color:#39414B;color:#9AA6B2}
   </section>
 
   <section class="paso">
-    <div class="paso-cabeza"><span class="paso-num">02</span><span class="paso-titulo">Grabar</span></div>
+    <div class="paso-cabeza"><span class="paso-num">02</span><span class="paso-titulo">Cuándo fue</span></div>
+    <div class="carta">
+      <div class="campo">
+        <label for="fechaSesion">Fecha de la sesión</label>
+        <input id="fechaSesion" type="date">
+      </div>
+      <p class="limite">Si la sesión fue hace días, pon la fecha real. Es la que va al
+        expediente y al reporte, no la de hoy.</p>
+    </div>
+  </section>
+
+  <section class="paso">
+    <div class="paso-cabeza"><span class="paso-num">03</span><span class="paso-titulo">Grabar</span></div>
     <div class="carta">
       <div class="reloj">
         <div class="tiempo" id="tiempo">00:00</div>
@@ -257,7 +269,7 @@ body.grabando .subir{background:#1B2027;border-color:#39414B;color:#9AA6B2}
   </section>
 
   <section class="paso">
-    <div class="paso-cabeza"><span class="paso-num">03</span><span class="paso-titulo">Adjuntar</span></div>
+    <div class="paso-cabeza"><span class="paso-num">04</span><span class="paso-titulo">Adjuntar</span></div>
     <div class="carta">
       <p class="limite" id="ayudaAdj" style="margin-bottom:11px"></p>
       <label class="subir">
@@ -273,7 +285,7 @@ body.grabando .subir{background:#1B2027;border-color:#39414B;color:#9AA6B2}
   </section>
 
   <section class="paso">
-    <div class="paso-cabeza"><span class="paso-num">04</span><span class="paso-titulo">Enviar</span></div>
+    <div class="paso-cabeza"><span class="paso-num">05</span><span class="paso-titulo">Enviar</span></div>
     <div class="carta">
       <button class="btn btn-enviar" id="btnEnviar" onclick="enviar()" disabled>Enviar y generar documento</button>
       <div class="cargando" id="cargando">
@@ -839,6 +851,7 @@ async function enviar(){
     cuerpo.append('tipo',modo);
     cuerpo.append('codigo',codigo);
     cuerpo.append('sesion',sesionActual());
+    cuerpo.append('fecha',val('fechaSesion')||'');
     cuerpo.append('profesional',PROF);
     if(audio){
       cuerpo.append('audio',audio);
@@ -941,6 +954,8 @@ document.getElementById('sesion').addEventListener('input',function(){
 document.getElementById('explica').textContent=TEXTOS.TI;
 document.getElementById('ayudaAdj').textContent=AYUDA_ADJ.TI;
 cargarLugares();
+(function(){ const f=document.getElementById('fechaSesion');
+  if(f) f.value=new Date().toISOString().slice(0,10); })();
 document.getElementById('secNuevo').hidden = true;
 buscarCasos();
 revisarEnvio();
