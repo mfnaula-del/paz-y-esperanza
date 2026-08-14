@@ -205,6 +205,10 @@ table.of td.c{text-align:center;width:11%}
   padding:14px;font-size:14px;color:var(--oliva);cursor:pointer;background:#FBFBFA}
 .subir-esc:hover{border-color:var(--oliva)}
 .subir-esc input{display:none}
+/* Casilla para llenar a mano: cuanto más grande y despejada, mejor se lee
+   después, sea que la persona ponga una X, un punto o la rellene entera. */
+.casilla-blanco{display:inline-block;width:17px;height:17px;border:1.4px solid #333;
+  border-radius:2px;background:#fff;vertical-align:middle}
 .chip-claro{background:#EDF1EC;border:1px solid var(--linea);color:var(--oliva)}
 .chip-claro[aria-pressed="true"]{background:var(--oliva);border-color:var(--oliva);color:#fff}
 .lote{border:1px solid var(--linea);border-radius:10px;background:#FBFBFA;margin-top:8px;overflow:hidden}
@@ -415,6 +419,13 @@ if (typeof html2pdf === 'undefined') {
       <div class="cabecera-grupo" id="gCabecera"></div>
       <div class="acciones-grupo">
         <button class="btn btn-suave" onclick="gImprimirBlanco()">Imprimir hojas en blanco</button>
+        <div class="campo" style="margin-bottom:10px">
+          <label for="gFechaLote">Fecha de aplicación del grupo</label>
+          <input id="gFechaLote" type="date">
+          <p class="ayuda" style="font-size:11.5px;color:var(--apagado);margin-top:6px;
+             line-height:1.45">Se aplica a todas las hojas del lote. Si alguna trae su
+             fecha escrita, se respeta la de la hoja.</p>
+        </div>
         <label class="subir-esc">
           Subir hojas escaneadas
           <input type="file" id="gEscaneos" accept="image/*,application/pdf" multiple
@@ -1173,6 +1184,9 @@ function lPonerMomento(v){
 // petición, así que las tandas se envían de a pocas y con pausa entre ellas.
 // Es más lento pero no se topa, y así nadie tiene que contar archivos.
 const POR_TANDA = 4, PAUSA_MS = 22000;
+// Un PDF de 10 páginas suele leerse incompleto: el modelo se queda en las
+// primeras. Mandarlo en trozos de 3 páginas resuelve eso.
+const PAGINAS_POR_ENVIO = 3;
 const dormir = ms => new Promise(r=>setTimeout(r,ms));
 
 async function lLeerEscaneos(input){
@@ -1527,6 +1541,9 @@ function hojaOficial(d,momento){
   + '</tbody></table>'
 
   + '<h3>INSTRUCCIONES</h3><p>'+esc(d.consigna)+'</p>'
+  + '<p style="font-size:8.5pt;font-style:italic;color:#555;margin-top:3px">'
+  + 'Marque una sola casilla por fila. Puede usar una X, una palomita, rellenarla '
+  + 'o poner un punto: cualquier marca clara sirve.</p>'
 
   + '<table class="of" style="margin-top:10px"><thead><tr>'
   +   '<th class="izq">'+esc(d.encabezado_tabla)+'</th>'
@@ -1775,6 +1792,19 @@ async function gLeerEscaneos(input){
   cg.classList.add('on');
   document.getElementById('gAviso').innerHTML='';
 
+  // los PDF largos se leen incompletos: conviene avisarlo antes
+  for(const f of files){
+    if(f.type!=='application/pdf') continue;
+    const n=await paginasPdf(f);
+    if(n>PAGINAS_POR_ENVIO){
+      document.getElementById('gAviso').innerHTML=
+        '<div class="aviso neutro"><b>'+esc(f.name)+' tiene '+n+' páginas</b>'
+        +'Los PDF largos suelen leerse incompletos: el modelo se queda en las primeras. '
+        +'Si al terminar faltan hojas, sepáralo en archivos de '+PAGINAS_POR_ENVIO
+        +' páginas y súbelos juntos: se procesan igual y salen todas.</div>';
+    }
+  }
+
   const tandas=[];
   for(let i=0;i<files.length;i+=POR_TANDA) tandas.push(files.slice(i,i+POR_TANDA));
   let acumulado={hojas:[],sin_emparejar:0,incompletas:0,sin_fecha:0};
@@ -1817,6 +1847,7 @@ async function gLeerEscaneos(input){
     }
     cg.classList.remove('on');
     if(!acumulado.hojas.length) throw new Error(fallos.join(' · ') || 'no se pudo leer ninguna hoja');
+    acumulado.archivos = files.length;
     gAplicarLectura(acumulado);
     if(fallos.length) document.getElementById('gAviso').insertAdjacentHTML('afterbegin',
       '<div class="aviso neutro"><b>'+fallos.length+' tanda(s) fallaron</b>'
@@ -1836,7 +1867,7 @@ function gAplicarLectura(d){
     const i=GPART.findIndex(p=>p.nombre===hoja.nombre);
     if(i===-1){ huerfanas.push(hoja); return; }
     GPART[i].resp = hoja.respuestas.map(v=> (v>=1&&v<=5)?v:null);
-    GPART[i].fecha = hoja.fecha || '';
+    GPART[i].fecha = hoja.fecha || val('gFechaLote') || '';
     GPART[i].dudas = (hoja.dudas||[]).concat(
       hoja.respuestas.map((v,j)=>(v>=1&&v<=5)?null:j+1).filter(x=>x));
     GPART[i].abierto = GPART[i].dudas.length>0;
@@ -1846,6 +1877,14 @@ function gAplicarLectura(d){
 
   let aviso='<div class="aviso ok"><b>'+puestas+' hoja(s) leídas</b>'
     +'Revisa que las respuestas coincidan con el papel antes de guardar.</div>';
+  // si el grupo tiene más gente que hojas leídas, conviene avisarlo
+  const faltan = GPART.filter(p=>p.aplica).length - d.hojas.length;
+  if(d.hojas.length && faltan>0) aviso+='<div class="aviso neutro" style="margin-top:8px">'
+    +'<b>Se leyeron '+d.hojas.length+' hoja(s) y el grupo tiene '
+    +GPART.filter(p=>p.aplica).length+' participantes</b>'
+    +'Si subiste un PDF con todas juntas y solo salió una, prueba a separarlo en '
+    +'archivos de 3 o 4 páginas: los PDF largos a veces se leen incompletos. '
+    +'También puedes llenar las que falten a mano tocando el nombre.</div>';
   if(d.incompletas) aviso+='<div class="aviso neutro" style="margin-top:8px">'
     +'<b>'+d.incompletas+' con filas sin marca clara</b>'
     +'Las dejé en blanco a propósito: es preferible que las completes tú a que el sistema '
@@ -1884,6 +1923,25 @@ function gLeerPdf(f){
   });
 }
 
+/**
+ * Cuántas páginas tiene un PDF. Sirve para avisar cuando es largo, porque los
+ * PDF de muchas páginas se leen incompletos y conviene separarlos.
+ */
+function paginasPdf(f){
+  return new Promise(ok=>{
+    const fr=new FileReader();
+    fr.onloadend=()=>{
+      try{
+        const s=new TextDecoder('latin1').decode(new Uint8Array(fr.result));
+        const m=s.match(/\/Type\s*\/Page[^s]/g);
+        ok(m ? m.length : 0);
+      }catch(e){ ok(0); }
+    };
+    fr.onerror=()=>ok(0);
+    fr.readAsArrayBuffer(f);
+  });
+}
+
 // ---------------------------------------------------------- guardar
 async function gGuardarTodo(){
   const lote=GPART.filter(p=>p.aplica && p.resp.every(x=>x!==null))
@@ -1895,7 +1953,8 @@ async function gGuardarTodo(){
   btn.disabled=true; btn.textContent='Guardando…';
   try{
     const d=await pedir({accion:'guardarGrupo',codigo:GRUPO.codigo,momento:GMOMENTO,
-                         localidad:LOC,profesional:PROF,respuestas:JSON.stringify(lote)});
+                         localidad:LOC,profesional:PROF,fecha:val('gFechaLote')||'',
+                         respuestas:JSON.stringify(lote)});
     let html='<div class="aviso ok"><b>'+d.guardados+' guardadas</b>'
       +esc(d.nombres.slice(0,6).join(', '))+(d.nombres.length>6?' y otras…':'')+'</div>';
     if(d.saltados.length) html+='<div class="aviso neutro" style="margin-top:8px">'
@@ -1940,7 +1999,7 @@ async function gImprimirBlanco(){
 function gHojaBlanco(d,p){
   const filas=d.items.map((t,i)=>
     '<tr><td>'+(i+1)+'. '+esc(t)+'</td>'
-    + d.niveles.map(()=>'<td class="c"><span class="cb">☐</span></td>').join('')
+    + d.niveles.map(()=>'<td class="c"><span class="casilla-blanco"></span></td>').join('')
     + '</tr>').join('');
   return '<div class="hoja">'
   + bandaLogos()
@@ -1960,6 +2019,9 @@ function gHojaBlanco(d,p){
   +      '<td class="et">Género:</td><td>'+esc(p.genero||'')+'</td></tr>'
   + '</tbody></table>'
   + '<h3>INSTRUCCIONES</h3><p>'+esc(d.consigna)+'</p>'
+  + '<p style="font-size:8.5pt;font-style:italic;color:#555;margin-top:3px">'
+  + 'Marque una sola casilla por fila. Puede usar una X, una palomita, rellenarla '
+  + 'o poner un punto: cualquier marca clara sirve.</p>'
   + '<table class="of" style="margin-top:10px"><thead><tr>'
   +   '<th class="izq">'+esc(d.encabezado_tabla)+'</th>'
   +   d.niveles.map((n,i)=>'<th>'+esc(n)+'<br>('+(i+1)+')</th>').join('')
@@ -2100,6 +2162,9 @@ function estiloHoja(){
   +   '-webkit-print-color-adjust:exact;print-color-adjust:exact}'
   + 'table.of tr{page-break-inside:avoid}'
   + '.cb{font-size:10.5pt;line-height:1}'
+  + '.casilla-blanco{display:inline-block;width:5mm;height:5mm;border:0.4mm solid #333;'
+  +   'border-radius:0.5mm;background:#fff;vertical-align:middle;'
+  +   '-webkit-print-color-adjust:exact;print-color-adjust:exact}'
   + '.puntaje td{font-size:9pt}'
   + '.obs{border:1px solid #9aa5b1;min-height:30px;margin-top:3px}'
   + '.comparativa{border:1px solid #1F3864;border-radius:4px;padding:7px 9px;margin-top:7px}'
