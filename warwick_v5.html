@@ -162,6 +162,16 @@ table.of td.c{text-align:center;width:11%}
 .cabecera-grupo .cambiar{background:none;border:0;color:#fff;opacity:.7;font-family:inherit;
   font-size:12px;text-decoration:underline;cursor:pointer;margin-top:11px;padding:0}
 
+.fechas-ficha{background:#FBFBFA;border:1px solid var(--linea);border-radius:11px;
+  padding:13px 14px;margin-top:14px}
+.ff-tit{font-size:14px;font-weight:600}
+.ff-ayuda{font-size:11.5px;color:var(--apagado);line-height:1.45;margin-top:3px}
+.fila-fecha{display:flex;align-items:center;gap:10px;padding:8px 0;
+  border-bottom:1px solid var(--linea)}
+.fila-fecha:last-of-type{border-bottom:0}
+.ff-nom{flex:1;font-size:13.5px}
+.ff-pts{font-family:var(--mono);font-size:11px;color:var(--apagado)}
+.fila-fecha input{width:auto;font-size:13.5px;padding:6px 8px;margin:0}
 .acciones-ficha{display:flex;gap:8px;margin-top:12px}
 .acciones-ficha .btn{margin-top:0;flex:1}
 .acciones-grupo{display:flex;flex-direction:column;gap:8px;margin-top:12px}
@@ -1488,7 +1498,8 @@ async function elegirFicha(i){
     if(d.pre)  html+=hojaOficial(d,'pre');
     if(d.post) html+=hojaOficial(d,'post');
     if(d.pre&&d.post) html+=hojaComparativa(d);
-    html+='<div class="acciones-ficha no-imprimir">'
+    html+=bloqueFechas(d)
+      +'<div class="acciones-ficha no-imprimir">'
       +'<button class="btn btn-tinta" onclick="imprimirHojas(\'fichaSalida\')">Imprimir</button>'
       +'<button class="btn btn-enviar" onclick="pdfADrive()">Guardar en Drive</button>'
       +'</div><div id="pdfSalida" class="no-imprimir"></div>';
@@ -2204,6 +2215,58 @@ function imprimirHojas(contenedor){
   // esperar a que carguen los logos antes de abrir el diálogo
   v.onload = () => { setTimeout(() => { v.focus(); v.print(); }, 350); };
   setTimeout(() => { try{ v.focus(); v.print(); }catch(e){} }, 900);
+}
+
+
+// ---------------------------------------------------------- corregir fechas
+function bloqueFechas(d){
+  const filas=[];
+  if(d.pre)  filas.push(['pre','inicial',d.pre]);
+  if(d.post) filas.push(['post','final',d.post]);
+  if(!filas.length) return '';
+  return '<div class="fechas-ficha no-imprimir">'
+    + '<p class="ff-tit">Fechas de aplicación</p>'
+    + '<p class="ff-ayuda">El sistema las lee del papel y a veces se equivoca. '
+    +   'Corrige la que esté mal.</p>'
+    + filas.map(f=>'<div class="fila-fecha">'
+        +'<span class="ff-nom">Warwick '+f[1]
+        +  ' <span class="ff-pts">'+f[2].bruto+'/35</span></span>'
+        +'<input type="date" value="'+esc(isoDe(f[2].fecha))+'" '
+        +  'onchange="corregirFechaTest(\''+f[0]+'\',this.value)">'
+        +'</div>').join('')
+    + '<div id="ffSalida"></div></div>';
+}
+
+/** Pasa una fecha en cualquier formato a AAAA-MM-DD, que es lo que pide el campo. */
+function isoDe(v){
+  if(!v) return '';
+  const s=String(v);
+  let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return m[1]+'-'+m[2]+'-'+m[3];
+  m=s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/);   // dd/mm/aaaa
+  if(m) return m[3]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[1]).padStart(2,'0');
+  const f=new Date(s);
+  return isNaN(f.getTime()) ? '' : f.toISOString().slice(0,10);
+}
+
+async function corregirFechaTest(momento, valor){
+  const salida=document.getElementById('ffSalida');
+  const d=window.FICHA;
+  if(!d || !valor) return;
+  salida.innerHTML='<div class="aviso neutro">Guardando…</div>';
+  try{
+    const f=await pedir({accion:'fechasCaso',profesional:PROF,
+                         codigo:d.codigo,nombre:d.nombre});
+    const t=(f.tests||[]).filter(x=>x.momento===momento)[0];
+    if(!t) throw new Error('no encuentro esa medición');
+    const r=await pedir({accion:'corregirFecha',profesional:PROF,codigo:d.codigo,
+                         donde:'test',fila:t.fila,fecha:valor,quien:d.nombre});
+    salida.innerHTML='<div class="aviso ok"><b>Fecha corregida</b>'
+      +'Antes: '+esc(r.antes)+'<br>Ahora: '+esc(r.ahora)
+      +'<br>Vuelve a abrir la ficha para verla actualizada.</div>';
+  }catch(e){
+    salida.innerHTML='<div class="aviso error"><b>No se pudo</b>'+esc(e.message)+'</div>';
+  }
 }
 
 // ---------------------------------------------------------- reporte

@@ -86,6 +86,32 @@ body.grabando .codigo.listo{background:var(--oliva);color:#fff}
 @keyframes latir{50%{opacity:.25}}
 audio{width:100%;margin-top:12px}
 
+.rect-ej{background:#EDF1EC;border-radius:9px;padding:10px 12px;margin:9px 0;
+  font-size:12px;line-height:1.5;color:#2C351F}
+.rect-ej b{display:block;margin-bottom:4px;font-size:11px;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--oliva)}
+.rect-ej span{display:block;margin-top:3px;font-style:italic}
+.rect-tipo{display:inline-block;padding:1px 8px;border-radius:20px;font-size:10px;
+  font-weight:700;background:var(--oliva);color:#fff;vertical-align:1px}
+.rect-caja{border-top:1px solid var(--linea);margin-top:16px;padding-top:14px}
+.rect-caja textarea{width:100%;font-family:inherit;font-size:14px;padding:10px;
+  border:1px solid var(--linea);border-radius:9px;background:#FBFBFA;resize:vertical;
+  margin-top:4px}
+.rect-reloj{text-align:center;font-family:var(--mono);font-size:26px;color:var(--senal);
+  margin:8px 0}
+.fechas-caja{border-top:1px solid var(--linea);margin-top:16px;padding-top:14px}
+.fila-fecha{display:flex;align-items:center;gap:10px;padding:7px 0;
+  border-bottom:1px solid var(--linea)}
+.fila-fecha:last-of-type{border-bottom:0}
+.ff-nom{flex:1;font-size:13.5px}
+.ff-pts{font-family:var(--mono);font-size:11px;color:var(--apagado)}
+.fila-fecha input{width:auto;font-size:13.5px;padding:6px 8px;margin:0}
+.corregir{background:#FBFBFA;border:1px solid var(--linea);border-radius:11px;
+  padding:14px;margin-top:12px}
+.corr-tit{font-size:14px;font-weight:600}
+.borrar-caja{border-top:1px solid var(--linea);margin-top:16px;padding-top:14px}
+.borrar-caja.bloqueado{opacity:.7}
+.btn-borrar{background:var(--senal);color:#fff;margin-top:9px}
 .casos{display:flex;flex-direction:column;gap:8px;margin-top:11px}
 .caso{background:#FBFBFA;border:1px solid var(--linea);border-radius:10px;padding:11px 13px;
   text-align:left;font-family:inherit;color:inherit;cursor:pointer;display:block;width:100%;
@@ -477,7 +503,10 @@ function elegirCaso(i){
     +   ' · lleva '+CASO.sesiones+(CASO.sesiones===1?' sesión':' sesiones')+'</span>'
     + '<span class="el-cod">'+esc(CASO.codigo)+'</span>'
     + '<button class="el-cambiar" onclick="soltarCaso()">Elegir a otra persona</button>'
+    + '<button class="el-cambiar" style="margin-left:16px" onclick="abrirCorregir()">'
+    +   'Corregir datos</button>'
     + '</div>'
+    + '<div id="cajaCorregir"></div>'
     + '<div class="campo" style="margin-top:12px">'
     +   '<label for="sesionSeguir">N° de sesión</label>'
     +   '<input id="sesionSeguir" type="number" min="1" value="'+CASO.siguiente+'" '
@@ -501,6 +530,274 @@ function soltarCaso(){
 function sesionActual(){
   if(ENTRADA==='seguir' && CASO) return val('sesionSeguir') || String(CASO.siguiente);
   return val('sesion') || '1';
+}
+
+
+// ============================================================================
+//  CORREGIR Y BORRAR
+//  Las profesionales no tienen acceso al Sheets, así que necesitan poder
+//  arreglar sus propios errores. Corregir un dato es cotidiano; borrar un caso
+//  solo se permite si está vacío, porque un borrado no se deshace.
+// ============================================================================
+const CAMPOS = [
+  ['nombre',       'Nombre y apellidos'],
+  ['edad',         'Edad'],
+  ['cedula',       'Documento de identidad'],
+  ['genero',       'Género'],
+  ['vbg',          '¿Víctima de VBG?'],
+  ['discapacidad', '¿Discapacidad?']
+];
+
+async function abrirCorregir(){
+  if(!CASO) return;
+  const caja=document.getElementById('cajaCorregir');
+  caja.innerHTML='<p class="limite" style="margin-top:12px">Cargando…</p>';
+  try{
+    const est=await pedir({accion:'estadoCaso',codigo:CASO.codigo,profesional:PROF});
+    caja.innerHTML =
+        '<div class="corregir">'
+      + '<p class="corr-tit">Corregir datos de este caso</p>'
+      + '<div class="campo" style="margin-top:10px">'
+      +   '<label for="corrCampo">Qué corregir</label>'
+      +   '<select id="corrCampo" onchange="document.getElementById(\'corrValor\').value=\'\'">'
+      +     CAMPOS.map(c=>'<option value="'+c[0]+'">'+c[1]+'</option>').join('')
+      +   '</select>'
+      + '</div>'
+      + '<div class="campo">'
+      +   '<label for="corrValor">Valor correcto</label>'
+      +   '<input id="corrValor" placeholder="Escríbelo tal como debe quedar">'
+      + '</div>'
+      + '<button class="btn btn-enviar" onclick="guardarCorreccion()">Guardar la corrección</button>'
+      + '<p class="limite">Se corrige en todas las hojas a la vez y queda registrado '
+      +   'quién lo cambió y cuándo.</p>'
+      + '<div id="cajaFechas"></div>'
+      + bloqueRectificar()
+      + bloqueBorrar(est)
+      + '<div id="corrSalida"></div>'
+      + '</div>';
+    cargarFechas();
+  }catch(e){
+    caja.innerHTML='<div class="aviso error">'+esc(e.message)+'</div>';
+  }
+}
+
+function bloqueBorrar(est){
+  if(est.borrable){
+    const n=parseInt(CASO.numero,10);
+    return '<div class="borrar-caja">'
+      + '<p class="corr-tit" style="color:var(--senal)">Eliminar este caso</p>'
+      + '<p class="limite">Este caso está vacío: no tiene sesiones dictadas ni Warwick. '
+      +   'Se puede borrar si se creó por error o quedó duplicado. '
+      +   '<b>No se puede deshacer.</b></p>'
+      + '<div class="campo" style="margin-top:9px">'
+      +   '<label for="corrConf">Escribe el número del caso para confirmar: '+n+'</label>'
+      +   '<input id="corrConf" inputmode="numeric" placeholder="'+n+'">'
+      + '</div>'
+      + '<button class="btn btn-borrar" onclick="borrarEsteCaso()">Eliminar el caso</button>'
+      + '</div>';
+  }
+  return '<div class="borrar-caja bloqueado">'
+    + '<p class="corr-tit">No se puede eliminar</p>'
+    + '<p class="limite">'+esc(est.motivo)+' Si de verdad hay que borrarlo, pídelo al '
+    + 'responsable del sistema: puede revisarlo antes de que se pierda.</p></div>';
+}
+
+async function guardarCorreccion(){
+  const campo=val('corrCampo'), valor=val('corrValor');
+  const salida=document.getElementById('corrSalida');
+  if(!valor){ salida.innerHTML='<div class="aviso neutro">Escribe el valor correcto.</div>'; return; }
+  salida.innerHTML='<div class="aviso neutro">Corrigiendo…</div>';
+  try{
+    const d=await pedir({accion:'corregirDato',profesional:PROF,codigo:CASO.codigo,
+                         nombre:CASO.nombre,campo:campo,valor:valor});
+    salida.innerHTML='<div class="aviso ok"><b>Corregido</b>'
+      + (d.anterior?'Antes: '+esc(d.anterior)+'<br>':'')
+      + 'Ahora: '+esc(d.nuevo)+'<br>'
+      + d.cambiadas+' fila(s) actualizadas.</div>';
+    if(campo==='nombre') CASO.nombre=valor;
+    setTimeout(buscarCasos, 800);
+  }catch(e){
+    salida.innerHTML='<div class="aviso error"><b>No se pudo corregir</b>'+esc(e.message)+'</div>';
+  }
+}
+
+async function borrarEsteCaso(){
+  const salida=document.getElementById('corrSalida');
+  salida.innerHTML='<div class="aviso neutro">Eliminando…</div>';
+  try{
+    const d=await pedir({accion:'borrarCaso',profesional:PROF,codigo:CASO.codigo,
+                         confirmacion:val('corrConf')});
+    salida.innerHTML='<div class="aviso ok"><b>Caso eliminado</b>'+esc(d.mensaje)+'</div>';
+    setTimeout(()=>{ soltarCaso(); buscarCasos(); }, 1500);
+  }catch(e){
+    salida.innerHTML='<div class="aviso error"><b>No se eliminó</b>'+esc(e.message)+'</div>';
+  }
+}
+
+
+// ---------------------------------------------------------- fechas
+async function cargarFechas(){
+  const caja=document.getElementById('cajaFechas');
+  if(!caja || !CASO) return;
+  try{
+    const d=await pedir({accion:'fechasCaso',profesional:PROF,
+                         codigo:CASO.codigo,nombre:CASO.nombre});
+    if(!d.sesiones.length && !d.tests.length){ caja.innerHTML=''; return; }
+
+    let html='<div class="fechas-caja"><p class="corr-tit">Fechas registradas</p>'
+      +'<p class="limite">El sistema las lee del papel y a veces se equivoca. '
+      +'Corrige la que esté mal.</p>';
+
+    d.sesiones.forEach(function(s){
+      html+='<div class="fila-fecha">'
+        +'<span class="ff-nom">Sesión '+s.sesion+'</span>'
+        +'<input type="date" value="'+esc(s.fecha)+'" '
+        +  'onchange="guardarFecha(\'sesion\','+s.fila+',this.value)">'
+        +'</div>';
+    });
+    d.tests.forEach(function(t){
+      html+='<div class="fila-fecha">'
+        +'<span class="ff-nom">Warwick '+(t.momento==='post'?'final':'inicial')
+        +  (t.bruto?' <span class="ff-pts">'+t.bruto+'/35</span>':'')+'</span>'
+        +'<input type="date" value="'+esc(t.fecha)+'" '
+        +  'onchange="guardarFecha(\'test\','+t.fila+',this.value)">'
+        +'</div>';
+    });
+    html+='<div id="fechaSalida"></div></div>';
+    caja.innerHTML=html;
+  }catch(e){ caja.innerHTML=''; }
+}
+
+async function guardarFecha(donde,fila,valor){
+  const salida=document.getElementById('fechaSalida');
+  if(!valor){ salida.innerHTML='<div class="aviso neutro">Pon una fecha.</div>'; return; }
+  salida.innerHTML='<div class="aviso neutro">Guardando…</div>';
+  try{
+    const d=await pedir({accion:'corregirFecha',profesional:PROF,codigo:CASO.codigo,
+                         donde:donde,fila:fila,fecha:valor,quien:CASO.nombre});
+    salida.innerHTML='<div class="aviso ok"><b>Fecha corregida</b>'
+      +'Antes: '+esc(d.antes)+'<br>Ahora: '+esc(d.ahora)+'</div>';
+    setTimeout(function(){ salida.innerHTML=''; }, 3000);
+  }catch(e){
+    salida.innerHTML='<div class="aviso error"><b>No se pudo</b>'+esc(e.message)+'</div>';
+    cargarFechas();
+  }
+}
+
+
+// ---------------------------------------------------------- rectificar
+function bloqueRectificar(){
+  return '<div class="rect-caja">'
+    + '<p class="corr-tit">Corregir o ampliar el informe</p>'
+    + '<p class="limite">Dile qué está mal o qué le falta. Sirve para las dos cosas: '
+    +   'quitar algo que no ocurrió, corregir un dato, o agregar y desarrollar lo que '
+    +   'no quedó recogido.</p>'
+    + '<div class="rect-ej">'
+    +   '<b>Por ejemplo</b>'
+    +   '<span>«No apliqué el WHOQOL, quítalo del informe»</span>'
+    +   '<span>«La edad está mal, tiene 34 no 43»</span>'
+    +   '<span>«Agrega que en la sesión 2 se trabajó regulación emocional con técnicas '
+    +     'de respiración, y que la paciente respondió bien»</span>'
+    +   '<span>«Desarrolla más la impresión diagnóstica»</span>'
+    + '</div>'
+    + '<div class="rect-reloj" id="rectReloj" hidden>00:00</div>'
+    + '<button class="btn btn-suave" id="btnRect" onclick="alternarRect()">'
+    +   'Dictarlo</button>'
+    + '<p class="limite" style="text-align:center">o escríbela</p>'
+    + '<textarea id="rectTexto" rows="4" placeholder="Escribe qué corregir o qué '
+    +   'agregar al informe"></textarea>'
+    + '<button class="btn btn-enviar" onclick="enviarRect()">Aplicar al informe</button>'
+    + '<div class="cargando" id="rectCargando"></div>'
+    + '<div id="rectSalida"></div>'
+    + '</div>';
+}
+
+let rectGrab=false, rectCtx, rectFuente, rectProc, rectPista, rectTrozos=[],
+    rectHz=48000, rectT0, rectCrono, rectBlob=null;
+
+async function alternarRect(){
+  const btn=document.getElementById('btnRect');
+  if(rectGrab){
+    rectGrab=false;
+    clearInterval(rectCrono);
+    try{ rectProc.disconnect(); rectFuente.disconnect(); rectPista.getTracks().forEach(t=>t.stop()); }catch(e){}
+    rectBlob=aWav(rectTrozos, rectHz);
+    document.getElementById('rectReloj').hidden=true;
+    btn.textContent='Volver a dictar';
+    document.getElementById('rectSalida').innerHTML=
+      '<div class="aviso ok">Grabado. Toca "Corregir el informe".</div>';
+    return;
+  }
+  try{
+    rectPista=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,
+      echoCancellation:true,noiseSuppression:true}});
+    rectCtx=new (window.AudioContext||window.webkitAudioContext)();
+    rectHz=rectCtx.sampleRate;
+    rectFuente=rectCtx.createMediaStreamSource(rectPista);
+    rectProc=rectCtx.createScriptProcessor(4096,1,1);
+    rectTrozos=[];
+    rectProc.onaudioprocess=e=>{ if(rectGrab) rectTrozos.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
+    rectFuente.connect(rectProc); rectProc.connect(rectCtx.destination);
+    rectGrab=true; rectT0=Date.now();
+    document.getElementById('rectReloj').hidden=false;
+    btn.textContent='Detener';
+    rectCrono=setInterval(()=>{
+      const s=Math.floor((Date.now()-rectT0)/1000);
+      document.getElementById('rectReloj').textContent=
+        String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+      if(s>=120) alternarRect();
+    },250);
+  }catch(e){
+    document.getElementById('rectSalida').innerHTML=
+      '<div class="aviso error">No se pudo usar el micrófono. Escribe la corrección.</div>';
+  }
+}
+
+async function enviarRect(){
+  const texto=val('rectTexto');
+  if(!rectBlob && !texto){
+    document.getElementById('rectSalida').innerHTML=
+      '<div class="aviso neutro">Dicta o escribe qué hay que corregir.</div>';
+    return;
+  }
+  const cg=document.getElementById('rectCargando');
+  cg.classList.add('on'); cg.textContent='Corrigiendo el informe…';
+  document.getElementById('rectSalida').innerHTML='';
+  try{
+    const cuerpo=new URLSearchParams();
+    cuerpo.append('accion','rectificar');
+    cuerpo.append('profesional',PROF);
+    cuerpo.append('codigo',CASO.codigo);
+    cuerpo.append('nombre',CASO.nombre||'');
+    if(texto) cuerpo.append('texto',texto);
+    if(rectBlob){
+      cuerpo.append('audio',await aBase64(rectBlob));
+      cuerpo.append('audioMime','audio/wav');
+    }
+    const r=await fetch(URL_BACKEND,{method:'POST',body:cuerpo});
+    const d=await r.json();
+    cg.classList.remove('on');
+    if(!d.exito) throw new Error(d.error||'error');
+
+    const etq={quitar:'quitado',corregir:'corregido',agregar:'agregado',ampliar:'ampliado'};
+    document.getElementById('rectSalida').innerHTML=
+        '<div class="aviso ok"><b>Informe actualizado</b>'
+      + (d.resumen?esc(d.resumen)+'<br><br>':'')
+      + (d.cambios||[]).map(c=>
+            '<b>'+esc(c.que)+'</b>'
+          + (c.tipo?' <span class="rect-tipo">'+esc(etq[c.tipo]||c.tipo)+'</span>':'')
+          + (c.antes?'<br>antes: '+esc(c.antes):'')
+          + (c.despues?'<br>ahora: '+esc(c.despues):'')).join('<br><br>')
+      + (d.documento?'<p style="margin-top:10px"><a href="'+esc(d.documento)
+          +'" target="_blank" rel="noopener">Abrir el documento corregido</a></p>':'')
+      + '</div>';
+    rectBlob=null;
+    document.getElementById('rectTexto').value='';
+  }catch(e){
+    cg.classList.remove('on');
+    document.getElementById('rectSalida').innerHTML=
+      '<div class="aviso error"><b>No se pudo corregir</b>'+esc(e.message)+'</div>';
+  }
 }
 
 // ------------------------------------------------------------- lugar
@@ -834,7 +1131,7 @@ function revisarEnvio(){
     : 'Enviar y generar documento';
 }
 
-async function enviar(){
+async function enviar(rehacer){
   const codigo=armarCodigo();
   if(!codigo || (!wavBlob && !ADJUNTOS.length)) return;
   document.getElementById('cargando').classList.add('on');
@@ -852,6 +1149,7 @@ async function enviar(){
     cuerpo.append('codigo',codigo);
     cuerpo.append('sesion',sesionActual());
     cuerpo.append('fecha',val('fechaSesion')||'');
+    if(rehacer) cuerpo.append('rehacer','si');
     cuerpo.append('profesional',PROF);
     if(audio){
       cuerpo.append('audio',audio);
@@ -874,8 +1172,16 @@ async function enviar(){
     mostrar(d);
   }catch(e){
     document.getElementById('cargando').classList.remove('on');
-    decir('error','No se pudo enviar',esc(e.message)
-      +' · Si dice "Failed to fetch", vuelve a implementar el Apps Script con acceso "Cualquier usuario".');
+    // si esa sesión ya estaba guardada, ofrecer reemplazarla en vez de dejarlo
+    // en un error sin salida
+    if(/ya está registrada/.test(e.message)){
+      decir('neutro','Esa sesión ya está guardada', esc(e.message)
+        +'<br><br><button class="btn btn-suave" style="margin-top:0" '
+        +'onclick="enviar(true)">Reemplazarla con este dictado</button>');
+    } else {
+      decir('error','No se pudo enviar',esc(e.message)
+        +' · Si dice "Failed to fetch", vuelve a implementar el Apps Script con acceso "Cualquier usuario".');
+    }
     document.getElementById('btnEnviar').disabled=false;
   }
 }
