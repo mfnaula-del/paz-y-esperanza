@@ -134,6 +134,12 @@ audio{width:100%;margin-top:12px}
 .el-cambiar{background:none;border:0;color:#fff;opacity:.75;font-family:inherit;font-size:12px;
   text-decoration:underline;cursor:pointer;margin-top:10px;padding:0}
 
+.aviso-coherencia{background:#FDF3E3;border-left:3px solid var(--ambar);border-radius:9px;
+  padding:12px 13px;margin-top:11px;font-size:13px;line-height:1.5;color:#5C4210}
+.aviso-coherencia b{display:block;margin-bottom:6px}
+.aviso-coherencia span{display:block;margin-top:5px;padding-left:11px;position:relative}
+.aviso-coherencia span:before{content:"·";position:absolute;left:2px}
+.aviso-coherencia p{margin-top:8px;font-size:12px;opacity:.85}
 .recordatorio{background:#EDF1EC;border-left:3px solid var(--oliva);border-radius:9px;
   padding:12px 13px;margin-top:11px;font-size:13px;line-height:1.5;color:#2C351F}
 .recordatorio b{display:block;margin-bottom:5px}
@@ -1201,6 +1207,11 @@ function mostrar(d){
   const revisar=(d.revisar&&d.revisar.length)
     ? '<div class="aviso error" style="margin-top:10px"><b>Revisar a mano</b>'+esc(d.revisar.join(', '))+'</div>':'';
   // qué corresponde hacer ahora: el Warwick de la sesión 2, el cierre del proceso…
+  // avisos de coherencia: casillas que no cuadran con el relato
+  const incoh=(d.incoherencias&&d.incoherencias.length)
+    ? '<div class="aviso-coherencia"><b>Revisa el informe antes de firmarlo</b>'
+      + d.incoherencias.map(x=>'<span>'+esc(x)+'</span>').join('')
+      + '<p>Si algo está mal, corrígelo con «Corregir o ampliar el informe».</p></div>' : '';
   const recordar=(d.recordatorio&&d.recordatorio.length)
     ? '<div class="recordatorio"><b>Qué toca ahora</b>'
       + d.recordatorio.map(x=>'<span>'+esc(x)+'</span>').join('') + '</div>' : '';
@@ -1221,6 +1232,7 @@ function mostrar(d){
     + fila('Trazabilidad',d.trazabilidad)
     + '</dl><p style="margin-top:10px"><a href="'+esc(d.documento)+'" target="_blank" rel="noopener">'
     + 'Abrir documento</a></p></div>' + nota
+    + incoh
     + recordar
     + revisar;
 }
