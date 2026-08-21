@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1B2027">
 <title>Atención Psicológica · Paz y Esperanza</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#3F4A3C">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Atención PyE">
+<link rel="apple-touch-icon" href="icono-192.png">
+<link rel="icon" type="image/png" href="icono-192.png">
 <style>
 :root{
   --tinta:#1B2027; --papel:#E9EBE6; --carta:#FFFFFF; --oliva:#3F4A3C;
@@ -67,6 +75,8 @@ h1{font-size:26px;font-weight:600;letter-spacing:-.025em;line-height:1.1;margin-
 .punto.ok{background:#4A7A42} .punto.mal{background:var(--senal)}
 .pie{margin-top:18px;font-size:11px;color:var(--apagado);line-height:1.6;text-align:center}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.inst-tit{font-size:15px;font-weight:600}
+.inst-txt{font-size:13px;color:var(--apagado);line-height:1.5;margin-top:5px}
 </style>
 </head>
 <body>
@@ -124,6 +134,16 @@ h1{font-size:26px;font-weight:600;letter-spacing:-.025em;line-height:1.1;margin-
 
   <p class="estado" id="estado"><span class="punto"></span>Comprobando el servidor…</p>
 
+  <section class="paso" id="cajaInstalar" hidden>
+    <div class="carta">
+      <p class="inst-tit">Ténla a mano</p>
+      <p class="inst-txt">Instálala como app y queda un icono en tu pantalla:
+        un toque y estás dentro, sin buscar el enlace.</p>
+      <button class="btn btn-enviar" onclick="instalarApp()">Instalar la app</button>
+      <div id="avisoInstalar"></div>
+    </div>
+  </section>
+
   <p class="pie">Documento confidencial · Estándares Esfera e IASC<br>
     Milton Fernando Naula Chimbo</p>
 </div>
@@ -149,11 +169,28 @@ const PROFESIONALES = {
 };
 function profesionalActual(){
   const u=new URLSearchParams(location.search).get('prof');
-  if(PROFESIONALES[u]) return u;
+  if(PROFESIONALES[u]){ recordarProfesional(u); return u; }
+
+  // Al instalar la app como icono, se abre sin ?prof= y todas caerían en el
+  // profesional por defecto. Por eso se recuerda quién la instaló.
+  const guardado = leerProfesionalGuardado();
+  if(guardado) return guardado;
+
   // compatibilidad con los enlaces viejos que llevaban ?loc=
   const l=new URLSearchParams(location.search).get('loc');
   const porLoc={MB:'MN',G:'PV',M:'MS'};
   return porLoc[l] || 'MN';
+}
+
+/** Guarda quién es, para que el icono de la app abra con su nombre. */
+function recordarProfesional(p){
+  try{ localStorage.setItem('pye_prof', p); }catch(e){}
+}
+function leerProfesionalGuardado(){
+  try{
+    const v = localStorage.getItem('pye_prof');
+    return (v && PROFESIONALES[v]) ? v : null;
+  }catch(e){ return null; }
 }
 function cambiarProfesional(){
   if(typeof ADMIN!=='undefined' && !ADMIN) return;
@@ -282,6 +319,47 @@ async function proxima(){
 }
 
 (async function(){ if(await comprobar()) proxima(); else proxima(); })();
+
+// ============================================================================
+//  INSTALAR COMO APP
+//  Un icono en la pantalla evita tener que buscar el enlace cada vez.
+// ============================================================================
+let INSTALADOR = null;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  INSTALADOR = e;
+  const c = document.getElementById('cajaInstalar');
+  if(c) c.hidden = false;
+});
+
+async function instalarApp(){
+  if(!INSTALADOR) return;
+  INSTALADOR.prompt();
+  const r = await INSTALADOR.userChoice;
+  INSTALADOR = null;
+  document.getElementById('cajaInstalar').hidden = true;
+  if(r.outcome === 'accepted')
+    document.getElementById('avisoInstalar').innerHTML =
+      '<div class="aviso ok">Listo. Busca el icono en tu pantalla.</div>';
+}
+
+// En iPhone no existe ese aviso: hay que explicar el paso a mano.
+(function(){
+  const esIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const yaInstalada = window.matchMedia('(display-mode: standalone)').matches
+                   || window.navigator.standalone === true;
+  if(esIOS && !yaInstalada){
+    const c = document.getElementById('cajaInstalar');
+    if(c){
+      c.hidden = false;
+      c.innerHTML = '<p class="inst-tit">Ténla a mano</p>'
+        + '<p class="inst-txt">Para que quede como un icono en tu pantalla: toca el '
+        + 'botón de compartir de Safari y elige <b>Añadir a pantalla de inicio</b>.</p>';
+    }
+  }
+})();
+
 </script>
 </body>
 </html>

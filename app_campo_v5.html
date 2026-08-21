@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1B2027">
 <title>Fichas de atención · Paz y Esperanza</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#3F4A3C">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Atención PyE">
+<link rel="apple-touch-icon" href="icono-192.png">
+<link rel="icon" type="image/png" href="icono-192.png">
 <style>
 :root{
   --tinta:#1B2027; --papel:#E9EBE6; --carta:#FFFFFF; --oliva:#3F4A3C;
@@ -353,11 +361,28 @@ const PROFESIONALES = {
 };
 function profesionalActual(){
   const u=new URLSearchParams(location.search).get('prof');
-  if(PROFESIONALES[u]) return u;
+  if(PROFESIONALES[u]){ recordarProfesional(u); return u; }
+
+  // Al instalar la app como icono, se abre sin ?prof= y todas caerían en el
+  // profesional por defecto. Por eso se recuerda quién la instaló.
+  const guardado = leerProfesionalGuardado();
+  if(guardado) return guardado;
+
   // compatibilidad con los enlaces viejos que llevaban ?loc=
   const l=new URLSearchParams(location.search).get('loc');
   const porLoc={MB:'MN',G:'PV',M:'MS'};
   return porLoc[l] || 'MN';
+}
+
+/** Guarda quién es, para que el icono de la app abra con su nombre. */
+function recordarProfesional(p){
+  try{ localStorage.setItem('pye_prof', p); }catch(e){}
+}
+function leerProfesionalGuardado(){
+  try{
+    const v = localStorage.getItem('pye_prof');
+    return (v && PROFESIONALES[v]) ? v : null;
+  }catch(e){ return null; }
 }
 function cambiarProfesional(){
   if(typeof ADMIN!=='undefined' && !ADMIN) return;

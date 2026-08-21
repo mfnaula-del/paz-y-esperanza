@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1B2027">
 <title>Escala Warwick · Paz y Esperanza</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#3F4A3C">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Atención PyE">
+<link rel="apple-touch-icon" href="icono-192.png">
+<link rel="icon" type="image/png" href="icono-192.png">
 <style>
 :root{
   --tinta:#1B2027; --papel:#E9EBE6; --carta:#FFFFFF; --oliva:#3F4A3C;
@@ -428,6 +436,7 @@ if (typeof html2pdf === 'undefined') {
       <div class="paso-cabeza"><span class="paso-num">01</span><span class="paso-titulo">Grupo</span></div>
       <div class="cabecera-grupo" id="gCabecera"></div>
       <div class="acciones-grupo">
+        <button class="btn btn-enviar" onclick="abrirGrupoCompleto()">Ver e imprimir todo el grupo</button>
         <button class="btn btn-suave" onclick="gImprimirBlanco()">Imprimir hojas en blanco</button>
         <div class="campo" style="margin-bottom:10px">
           <label for="gFechaLote">Fecha de aplicación del grupo</label>
@@ -1067,11 +1076,28 @@ const PROFESIONALES = {
 };
 function profesionalActual(){
   const u=new URLSearchParams(location.search).get('prof');
-  if(PROFESIONALES[u]) return u;
+  if(PROFESIONALES[u]){ recordarProfesional(u); return u; }
+
+  // Al instalar la app como icono, se abre sin ?prof= y todas caerían en el
+  // profesional por defecto. Por eso se recuerda quién la instaló.
+  const guardado = leerProfesionalGuardado();
+  if(guardado) return guardado;
+
   // compatibilidad con los enlaces viejos que llevaban ?loc=
   const l=new URLSearchParams(location.search).get('loc');
   const porLoc={MB:'MN',G:'PV',M:'MS'};
   return porLoc[l] || 'MN';
+}
+
+/** Guarda quién es, para que el icono de la app abra con su nombre. */
+function recordarProfesional(p){
+  try{ localStorage.setItem('pye_prof', p); }catch(e){}
+}
+function leerProfesionalGuardado(){
+  try{
+    const v = localStorage.getItem('pye_prof');
+    return (v && PROFESIONALES[v]) ? v : null;
+  }catch(e){ return null; }
 }
 function cambiarProfesional(){
   if(typeof ADMIN!=='undefined' && !ADMIN) return;
@@ -2217,6 +2243,121 @@ function imprimirHojas(contenedor){
   setTimeout(() => { try{ v.focus(); v.print(); }catch(e){} }, 900);
 }
 
+
+
+// ============================================================================
+//  TODO EL GRUPO DE UNA VEZ
+//  Con diez participantes, abrir la ficha de cada uno son veinte operaciones.
+//  Esto arma las hojas de todo el grupo y permite imprimirlas o guardarlas
+//  en Drive en una sola pasada.
+// ============================================================================
+let GRUPO_HOJAS = [];
+
+async function abrirGrupoCompleto(){
+  if(!GRUPO) return;
+  const caja = document.getElementById('gSalida');
+  const cg = document.getElementById('gCargando');
+  cg.classList.add('on');
+  caja.innerHTML = '';
+  GRUPO_HOJAS = [];
+
+  try{
+    const g = await pedir({accion:'grilla', codigo:GRUPO.codigo,
+                           localidad:LOC, profesional:PROF});
+    const gente = (g.participantes||[]).filter(p => p.aplica);
+    if(!gente.length){
+      cg.classList.remove('on');
+      caja.innerHTML = '<div class="aviso neutro"><b>Nadie con Warwick aplicable</b>'
+        + 'En este grupo no hay participantes de 17 años o más con mediciones.</div>';
+      return;
+    }
+
+    // la firma se pide una sola vez, no una por persona
+    let firma = null;
+    let html = '', conPre = 0, conPost = 0, sinNada = [];
+
+    for(let i=0;i<gente.length;i++){
+      cg.textContent = 'Armando ' + (i+1) + ' de ' + gente.length + '…';
+      try{
+        const d = await pedir({accion:'ficha', codigo:GRUPO.codigo, nombre:gente[i].nombre});
+        if(!d.pre && !d.post){ sinNada.push(gente[i].nombre); continue; }
+
+        if(firma === null && d.aplicador_clave){
+          try{ const f = await pedir({accion:'firma', clave:d.aplicador_clave});
+               firma = f.firma || false; }catch(e){ firma = false; }
+        }
+        if(firma) d.__firma = firma;
+
+        if(d.pre){  html += hojaOficial(d,'pre');  conPre++; }
+        if(d.post){ html += hojaOficial(d,'post'); conPost++; }
+        if(d.pre && d.post) html += hojaComparativa(d);
+        GRUPO_HOJAS.push(d);
+      }catch(e){ sinNada.push(gente[i].nombre); }
+    }
+
+    cg.classList.remove('on');
+    if(!GRUPO_HOJAS.length){
+      caja.innerHTML = '<div class="aviso neutro"><b>Sin mediciones guardadas</b>'
+        + 'Todavía no hay Warwick registrado para este grupo.</div>';
+      return;
+    }
+
+    caja.innerHTML =
+        '<div class="aviso ok no-imprimir"><b>' + GRUPO_HOJAS.length + ' participante(s)</b>'
+      + conPre + ' pre-test · ' + conPost + ' post-test'
+      + (sinNada.length ? '<br>Sin medición: ' + esc(sinNada.join(', ')) : '')
+      + '</div>'
+      + '<div class="acciones-ficha no-imprimir">'
+      +   '<button class="btn btn-tinta" onclick="imprimirHojas(\'gSalida\')">'
+      +     'Imprimir todo</button>'
+      +   '<button class="btn btn-enviar" onclick="grupoADrive()">'
+      +     'Guardar todo en Drive</button>'
+      + '</div>'
+      + '<div id="grupoSalida" class="no-imprimir"></div>'
+      + html;
+    caja.scrollIntoView({behavior:'smooth', block:'start'});
+
+  }catch(e){
+    cg.classList.remove('on');
+    caja.innerHTML = '<div class="aviso error"><b>No se pudo abrir</b>'+esc(e.message)+'</div>';
+  }
+}
+
+/** Guarda en Drive las hojas de todo el grupo, una por una. */
+async function grupoADrive(){
+  const caja = document.getElementById('grupoSalida');
+  const hojas = [...document.querySelectorAll('#gSalida .hoja')];
+  if(!hojas.length) return;
+
+  // cada participante aporta pre, post y comparativa según lo que tenga
+  const plan = [];
+  GRUPO_HOJAS.forEach(d => {
+    if(d.pre)  plan.push({nombre:d.nombre, momento:'pre'});
+    if(d.post) plan.push({nombre:d.nombre, momento:'post'});
+    if(d.pre && d.post) plan.push({nombre:d.nombre, momento:'comparativo'});
+  });
+
+  let hechos = 0;
+  const fallos = [];
+  for(let i=0;i<hojas.length && i<plan.length;i++){
+    caja.innerHTML = '<div class="aviso neutro"><b>Guardando ' + (i+1)
+      + ' de ' + plan.length + '…</b>No cierres la pestaña.</div>';
+    try{
+      const html = hojaAHtml(hojas[i]);
+      await pedir({accion:'guardarHtml', codigo:GRUPO.codigo,
+                   nombre:plan[i].nombre, momento:plan[i].momento, html:html});
+      hechos++;
+    }catch(e){ fallos.push(plan[i].nombre + ' (' + plan[i].momento + ')'); }
+  }
+
+  caja.innerHTML = hechos
+    ? '<div class="aviso ok"><b>' + hechos + ' archivo(s) en Drive</b>'
+      + 'Están en la carpeta del grupo, un documento por persona y momento.'
+      + (fallos.length ? '<br><br>No se pudieron guardar: ' + esc(fallos.join(', ')) : '')
+      + '</div>'
+    : '<div class="aviso error"><b>No se guardó ninguno</b>'
+      + esc(fallos.join(', ')) + '</div>';
+}
 
 // ---------------------------------------------------------- corregir fechas
 function bloqueFechas(d){
