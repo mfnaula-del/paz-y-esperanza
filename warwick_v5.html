@@ -189,6 +189,13 @@ table.of td.c{text-align:center;width:11%}
 .pgrupo + .pgrupo{margin-top:8px}
 .pgrupo.no{opacity:.5}
 .pgrupo.lista{border-color:var(--oliva)}
+.etq-leido{display:inline-block;margin-left:7px;padding:1px 8px;border-radius:20px;
+  font-size:10px;font-weight:600;background:#FDF3E3;color:#7A5410;vertical-align:1px}
+.pgrupo-fila{display:flex;align-items:stretch}
+.pgrupo-fila .pgrupo-cab{flex:1}
+.pgrupo-lapiz{background:none;border:0;border-left:1px solid var(--linea);
+  padding:0 14px;font-size:15px;color:var(--apagado);cursor:pointer;font-family:inherit}
+.pgrupo-lapiz:hover{color:var(--oliva);background:#F2F4F0}
 .pgrupo-cab{display:flex;align-items:center;gap:10px;padding:12px 13px;cursor:pointer;
   background:none;border:0;width:100%;text-align:left;font-family:inherit;color:inherit}
 .pgrupo-cab:disabled{cursor:not-allowed}
@@ -1770,19 +1777,28 @@ function gPintarGrilla(){
 function gDibujarParticipantes(){
   const d=GINFO;
   document.getElementById('gParticipantes').innerHTML = GPART.map((p,i)=>{
-    if(!p.aplica) return '<div class="pgrupo no"><div class="pgrupo-cab" style="cursor:default">'
+    if(!p.aplica) return '<div class="pgrupo no"><div class="pgrupo-fila">'
+      +'<div class="pgrupo-cab" style="cursor:default">'
       +'<span class="nom">'+esc(p.nombre)+'<span class="sub">'+esc(p.estado)+'</span></span>'
-      +'<span class="marca falta">—</span></div></div>';
+      +'<span class="marca falta">—</span></div>'
+      +'<button class="pgrupo-lapiz" onclick="gRenombrar('+i+')" '
+      +'title="Corregir el nombre">✎</button></div></div>';
 
     const n=p.resp.filter(x=>x!==null).length;
     const total=p.resp.reduce((a,b)=>a+(b||0),0);
     const listo=n===7;
     return '<div class="pgrupo'+(listo?' lista':'')+'">'
-      + '<button class="pgrupo-cab" onclick="gAbrir('+i+')">'
-      +   '<span class="nom">'+esc(p.nombre)
-      +     '<span class="sub">'+(p.edad?esc(p.edad)+' años · ':'')+esc(p.estado)+'</span></span>'
-      +   '<span class="marca '+(listo?'ok':'falta')+'">'+(listo?total+'/35':n+'/7')+'</span>'
-      + '</button>'
+      + '<div class="pgrupo-fila">'
+      +   '<button class="pgrupo-cab" onclick="gAbrir('+i+')">'
+      +     '<span class="nom">'+esc(p.nombre)
+      +       (p.leido?'<span class="etq-leido" title="Lo que decía el papel">'
+      +          esc(p.leido)+'</span>':'')
+      +       '<span class="sub">'+(p.edad?esc(p.edad)+' años · ':'')+esc(p.estado)+'</span></span>'
+      +     '<span class="marca '+(listo?'ok':'falta')+'">'+(listo?total+'/35':n+'/7')+'</span>'
+      +   '</button>'
+      +   '<button class="pgrupo-lapiz" onclick="gRenombrar('+i+')" '
+      +     'title="Corregir el nombre">✎</button>'
+      + '</div>'
       + '<div class="pgrupo-items" '+(p.abierto?'':'hidden')+'>'
       +   '<div class="fecha-hoja"><label>Fecha de aplicación</label>'
       +     '<input type="date" value="'+esc(p.fecha||'')+'" '
@@ -1905,6 +1921,9 @@ function gAplicarLectura(d){
     if(i===-1){ huerfanas.push(hoja); return; }
     GPART[i].resp = hoja.respuestas.map(v=> (v>=1&&v<=5)?v:null);
     GPART[i].fecha = hoja.fecha || val('gFechaLote') || '';
+    // lo que el escáner creyó leer, para revisarlo si no coincide
+    if(hoja.leido && normalizarTxt(hoja.leido) !== normalizarTxt(GPART[i].nombre))
+      GPART[i].leido = hoja.leido;
     GPART[i].dudas = (hoja.dudas||[]).concat(
       hoja.respuestas.map((v,j)=>(v>=1&&v<=5)?null:j+1).filter(x=>x));
     GPART[i].abierto = GPART[i].dudas.length>0;
@@ -2357,6 +2376,59 @@ async function grupoADrive(){
       + '</div>'
     : '<div class="aviso error"><b>No se guardó ninguno</b>'
       + esc(fallos.join(', ')) + '</div>';
+}
+
+
+/** Sin tildes ni mayúsculas, para comparar nombres escritos de distinta forma. */
+function normalizarTxt(s){
+  return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .toLowerCase().replace(/\s+/g,' ').trim();
+}
+
+// ---------------------------------------------------------- corregir nombres
+/**
+ * Corrige el nombre de un participante.
+ *
+ * El lector de escaneos transcribe mal los nombres con frecuencia. Corregirlo
+ * aquí lo cambia en todas las hojas de una vez: si se hiciera en una sola, la
+ * persona quedaría partida en dos, una con el pre y otra con el post.
+ */
+function gRenombrar(i){
+  const p = GPART[i];
+  if(!p) return;
+  const nuevo = prompt('Nombre correcto de esta persona:\n\n'
+    + 'Ahora dice: ' + p.nombre + '\n\n'
+    + 'Se corregirá en todas las hojas: sesiones, trazabilidad y Warwick.',
+    p.nombre);
+  if(nuevo === null) return;
+  aplicarRenombre(p.nombre, nuevo.trim(), false);
+}
+
+async function aplicarRenombre(viejo, nuevo, fusionar){
+  if(!nuevo || nuevo === viejo) return;
+  const caja = document.getElementById('gAviso');
+  caja.innerHTML = '<div class="aviso neutro">Corrigiendo…</div>';
+  try{
+    const d = await pedir({accion:'renombrar', profesional:PROF,
+      codigo:GRUPO.codigo, nombre:viejo, nuevo:nuevo,
+      fusionar: fusionar ? 'si' : ''});
+    caja.innerHTML = '<div class="aviso ok"><b>Nombre corregido</b>'
+      + esc(viejo) + '<br>→ ' + esc(nuevo)
+      + '<br><br>' + d.cambiadas + ' fila(s): ' + esc(d.donde.join(' · ')) + '</div>';
+    setTimeout(gCargarGrupo, 900);
+  }catch(e){
+    // si el nombre nuevo ya existe, ofrecer fusionarlos
+    if(/Ya hay alguien llamado/.test(e.message)){
+      caja.innerHTML = '<div class="aviso neutro"><b>Ese nombre ya existe</b>'
+        + esc(e.message)
+        + '<button class="btn btn-suave" onclick="aplicarRenombre('
+        +   JSON.stringify(viejo).replace(/"/g,'&quot;') + ','
+        +   JSON.stringify(nuevo).replace(/"/g,'&quot;') + ',true)">'
+        + 'Son la misma persona, únelos</button></div>';
+    } else {
+      caja.innerHTML = '<div class="aviso error"><b>No se pudo</b>'+esc(e.message)+'</div>';
+    }
+  }
 }
 
 // ---------------------------------------------------------- corregir fechas
