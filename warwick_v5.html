@@ -189,6 +189,18 @@ table.of td.c{text-align:center;width:11%}
 .pgrupo + .pgrupo{margin-top:8px}
 .pgrupo.no{opacity:.5}
 .pgrupo.lista{border-color:var(--oliva)}
+.sin-dueno{background:#FDF3E3;border-left:3px solid var(--ambar);border-radius:10px;
+  padding:13px 14px;margin-bottom:12px;color:#5C4210}
+.sd-tit{font-size:14.5px;font-weight:600}
+.sd-txt{font-size:12.5px;line-height:1.5;margin-top:4px;opacity:.9}
+.sd-fila{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:10px 0;border-bottom:1px solid rgba(0,0,0,.08)}
+.sd-fila:last-of-type{border-bottom:0}
+.sd-nom{flex:1;min-width:130px;font-size:13.5px;font-weight:600}
+.sd-det{display:block;font-size:11px;font-weight:400;opacity:.75;margin-top:1px}
+.sd-fila select{width:auto;min-width:140px;font-size:13px;padding:7px 8px;margin:0}
+.sd-btn{background:var(--oliva);color:#fff;border:0;border-radius:8px;
+  padding:8px 14px;font-size:13px;font-family:inherit;cursor:pointer}
 .etq-leido{display:inline-block;margin-left:7px;padding:1px 8px;border-radius:20px;
   font-size:10px;font-weight:600;background:#FDF3E3;color:#7A5410;vertical-align:1px}
 .pgrupo-fila{display:flex;align-items:stretch}
@@ -465,6 +477,7 @@ if (typeof html2pdf === 'undefined') {
     <section class="paso no-imprimir" id="gGrilla" hidden>
       <div class="paso-cabeza"><span class="paso-num">02</span><span class="paso-titulo">Respuestas</span></div>
       <div class="resumen-grupo" id="gResumen"></div>
+      <div id="gSinDueno"></div>
       <div id="gParticipantes"></div>
       <button class="btn btn-enviar" id="gGuardar" onclick="gGuardarTodo()" disabled>Guardar</button>
       <div id="gSalida"></div>
@@ -1735,6 +1748,7 @@ async function gRefrescar(){
     gPintarCabecera();
     gPintarGrilla();
     document.getElementById('gGrilla').hidden=false;
+    revisarSinDueno();
   }catch(e){
     document.getElementById('gAviso').innerHTML=
       '<div class="aviso error"><b>Error</b>'+esc(e.message)+'</div>';
@@ -2385,6 +2399,80 @@ function normalizarTxt(s){
     .toLowerCase().replace(/\s+/g,' ').trim();
 }
 
+
+// ============================================================================
+//  MEDICIONES SIN DUEÑO
+//  Cuando el lector transcribe mal un nombre, la medición queda a nombre de
+//  alguien que no existe y la persona real aparece sin Warwick. En grupal esto
+//  no se arregla corrigiendo la trazabilidad: ahí el nombre ES el identificador.
+// ============================================================================
+
+async function revisarSinDueno(){
+  if(!GRUPO) return;
+  const caja = document.getElementById('gSinDueno');
+  if(!caja) return;
+  try{
+    const d = await pedir({accion:'sinDueno', codigo:GRUPO.codigo, profesional:PROF});
+    if(!d.sueltas.length){ caja.innerHTML=''; return; }
+
+    caja.innerHTML =
+        '<div class="sin-dueno">'
+      + '<p class="sd-tit">' + d.sueltas.length + ' medición(es) sin dueño</p>'
+      + '<p class="sd-txt">Estas hojas se guardaron con un nombre que no está en el '
+      +   'grupo: seguramente el lector transcribió mal. Asígnalas a quien '
+      +   'corresponda.</p>'
+      + d.sueltas.map((s,i) =>
+            '<div class="sd-fila">'
+          + '<span class="sd-nom">"' + esc(s.nombre) + '"'
+          +   '<span class="sd-det">' + esc(s.momento) + ' · ' + s.puntaje + '/35'
+          +     (s.fecha ? ' · ' + esc(s.fecha) : '') + '</span></span>'
+          + '<select id="sd' + i + '">'
+          +   '<option value="">¿de quién es?</option>'
+          +   (s.parecidos.length
+              ? '<optgroup label="Se parece a">'
+                + s.parecidos.map(p => '<option>' + esc(p) + '</option>').join('')
+                + '</optgroup><optgroup label="Los demás">'
+                + d.participantes.filter(p => s.parecidos.indexOf(p) === -1)
+                    .map(p => '<option>' + esc(p) + '</option>').join('')
+                + '</optgroup>'
+              : d.participantes.map(p => '<option>' + esc(p) + '</option>').join(''))
+          + '</select>'
+          + '<button class="sd-btn" onclick="asignarSuelta(' + s.fila + ',' + i + ')">'
+          +   'Asignar</button>'
+          + '</div>').join('')
+      + '<div id="sdSalida"></div>'
+      + '</div>';
+  }catch(e){ caja.innerHTML=''; }
+}
+
+async function asignarSuelta(fila, i, reemplazar){
+  const sel = document.getElementById('sd'+i);
+  const nuevo = sel ? sel.value : '';
+  const salida = document.getElementById('sdSalida');
+  if(!nuevo){
+    salida.innerHTML = '<div class="aviso neutro">Elige de quién es.</div>';
+    return;
+  }
+  salida.innerHTML = '<div class="aviso neutro">Asignando…</div>';
+  try{
+    const d = await pedir({accion:'reasignar', profesional:PROF, codigo:GRUPO.codigo,
+      fila:fila, nuevo:nuevo, reemplazar: reemplazar ? 'si' : ''});
+    salida.innerHTML = '<div class="aviso ok"><b>Asignada</b>'
+      + 'El ' + esc(d.momento) + ' de "' + esc(d.antes) + '" ahora es de '
+      + esc(d.nuevo) + '.</div>';
+    setTimeout(gRefrescar, 900);
+  }catch(e){
+    if(/ya tiene un/.test(e.message)){
+      salida.innerHTML = '<div class="aviso neutro"><b>Ya tiene una medición</b>'
+        + esc(e.message)
+        + '<button class="btn btn-suave" onclick="asignarSuelta('+fila+','+i+',true)">'
+        + 'Reemplazar la anterior con esta</button></div>';
+    } else {
+      salida.innerHTML = '<div class="aviso error"><b>No se pudo</b>'+esc(e.message)+'</div>';
+    }
+  }
+}
+
 // ---------------------------------------------------------- corregir nombres
 /**
  * Corrige el nombre de un participante.
@@ -2415,7 +2503,7 @@ async function aplicarRenombre(viejo, nuevo, fusionar){
     caja.innerHTML = '<div class="aviso ok"><b>Nombre corregido</b>'
       + esc(viejo) + '<br>→ ' + esc(nuevo)
       + '<br><br>' + d.cambiadas + ' fila(s): ' + esc(d.donde.join(' · ')) + '</div>';
-    setTimeout(gCargarGrupo, 900);
+    setTimeout(gRefrescar, 900);
   }catch(e){
     // si el nombre nuevo ya existe, ofrecer fusionarlos
     if(/Ya hay alguien llamado/.test(e.message)){
