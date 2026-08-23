@@ -189,6 +189,11 @@ table.of td.c{text-align:center;width:11%}
 .pgrupo + .pgrupo{margin-top:8px}
 .pgrupo.no{opacity:.5}
 .pgrupo.lista{border-color:var(--oliva)}
+.ficha-part{background:#FBFBFA;border:1px solid var(--linea);border-radius:11px;
+  padding:14px;margin-bottom:12px}
+.fp-tit{font-size:15px;font-weight:600}
+.fp-txt{font-size:12.5px;color:var(--apagado);line-height:1.5;margin:4px 0 12px}
+.ficha-part .rejilla{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .sin-dueno{background:#FDF3E3;border-left:3px solid var(--ambar);border-radius:10px;
   padding:13px 14px;margin-bottom:12px;color:#5C4210}
 .sd-tit{font-size:14.5px;font-weight:600}
@@ -2484,38 +2489,99 @@ async function asignarSuelta(fila, i, reemplazar){
 function gRenombrar(i){
   const p = GPART[i];
   if(!p) return;
-  const nuevo = prompt('Nombre correcto de esta persona:\n\n'
-    + 'Ahora dice: ' + p.nombre + '\n\n'
-    + 'Se corregirá en todas las hojas: sesiones, trazabilidad y Warwick.',
-    p.nombre);
-  if(nuevo === null) return;
-  aplicarRenombre(p.nombre, nuevo.trim(), false);
+  abrirFichaParticipante(p.nombre);
 }
 
-async function aplicarRenombre(viejo, nuevo, fusionar){
-  if(!nuevo || nuevo === viejo) return;
+/**
+ * Formulario para revisar y corregir los datos de un participante.
+ *
+ * El lector de la lista de asistencia se equivoca con frecuencia con los
+ * nombres, las cédulas y las edades. Como las colegas no entran al Sheets,
+ * tienen que poder arreglarlo desde aquí.
+ */
+async function abrirFichaParticipante(nombre){
   const caja = document.getElementById('gAviso');
-  caja.innerHTML = '<div class="aviso neutro">Corrigiendo…</div>';
+  caja.innerHTML = '<div class="aviso neutro">Cargando…</div>';
   try{
-    const d = await pedir({accion:'renombrar', profesional:PROF,
-      codigo:GRUPO.codigo, nombre:viejo, nuevo:nuevo,
-      fusionar: fusionar ? 'si' : ''});
-    caja.innerHTML = '<div class="aviso ok"><b>Nombre corregido</b>'
-      + esc(viejo) + '<br>→ ' + esc(nuevo)
-      + '<br><br>' + d.cambiadas + ' fila(s): ' + esc(d.donde.join(' · ')) + '</div>';
-    setTimeout(gRefrescar, 900);
+    const d = await pedir({accion:'verParticipante', profesional:PROF,
+                           codigo:GRUPO.codigo, nombre:nombre});
+    const sel = function(id, valor, opciones){
+      return '<select id="'+id+'">'
+        + opciones.map(o => '<option'
+            + (normalizarTxt(o)===normalizarTxt(valor)?' selected':'')
+            + '>'+esc(o)+'</option>').join('')
+        + '</select>';
+    };
+
+    caja.innerHTML =
+        '<div class="ficha-part">'
+      + '<p class="fp-tit">Revisar los datos</p>'
+      + '<p class="fp-txt">Corrige lo que el lector de la lista haya entendido mal. '
+      +   'Se guarda en todas las hojas a la vez.</p>'
+      + '<input type="hidden" id="fpFila" value="'+d.fila+'">'
+      + '<input type="hidden" id="fpActual" value="'+esc(d.nombre)+'">'
+      + '<div class="campo"><label for="fpNombre">Nombre y apellidos</label>'
+      +   '<input id="fpNombre" value="'+esc(d.nombre)+'"></div>'
+      + '<div class="rejilla">'
+      +   '<div class="campo"><label for="fpDoc">Documento</label>'
+      +     '<input id="fpDoc" inputmode="numeric" value="'+esc(d.documento)+'"></div>'
+      +   '<div class="campo"><label for="fpEdad">Edad</label>'
+      +     '<input id="fpEdad" type="number" min="0" max="120" value="'+esc(d.edad)+'"></div>'
+      + '</div>'
+      + '<div class="rejilla">'
+      +   '<div class="campo"><label for="fpGenero">Género</label>'
+      +     sel('fpGenero', d.genero, ['','MUJER','HOMBRE','LGBTIQ+']) + '</div>'
+      +   '<div class="campo"><label for="fpNac">Nacionalidad</label>'
+      +     sel('fpNac', d.nacionalidad,
+             ['','ECUATORIANA','VENEZOLANA','COLOMBIANA','OTRA']) + '</div>'
+      + '</div>'
+      + '<div class="rejilla">'
+      +   '<div class="campo"><label for="fpDisc">¿Discapacidad?</label>'
+      +     sel('fpDisc', d.discapacidad, ['','NO','SI']) + '</div>'
+      +   '<div class="campo"><label for="fpVbg">¿Víctima de VBG?</label>'
+      +     sel('fpVbg', d.vbg, ['','NO','SI']) + '</div>'
+      + '</div>'
+      + '<button class="btn btn-enviar" onclick="guardarFichaParticipante()">'
+      +   'Guardar los cambios</button>'
+      + '<button class="btn btn-suave" onclick="document.getElementById(\'gAviso\').innerHTML=\'\'">'
+      +   'Dejarlo como está</button>'
+      + '<div id="fpSalida"></div>'
+      + '</div>';
+    caja.scrollIntoView({behavior:'smooth', block:'nearest'});
   }catch(e){
-    // si el nombre nuevo ya existe, ofrecer fusionarlos
-    if(/Ya hay alguien llamado/.test(e.message)){
-      caja.innerHTML = '<div class="aviso neutro"><b>Ese nombre ya existe</b>'
-        + esc(e.message)
-        + '<button class="btn btn-suave" onclick="aplicarRenombre('
-        +   JSON.stringify(viejo).replace(/"/g,'&quot;') + ','
-        +   JSON.stringify(nuevo).replace(/"/g,'&quot;') + ',true)">'
-        + 'Son la misma persona, únelos</button></div>';
-    } else {
-      caja.innerHTML = '<div class="aviso error"><b>No se pudo</b>'+esc(e.message)+'</div>';
+    caja.innerHTML = '<div class="aviso error"><b>No se pudo abrir</b>'+esc(e.message)+'</div>';
+  }
+}
+
+async function guardarFichaParticipante(){
+  const salida = document.getElementById('fpSalida');
+  const nombre = val('fpNombre');
+  if(!nombre){
+    salida.innerHTML = '<div class="aviso neutro">El nombre no puede quedar vacío.</div>';
+    return;
+  }
+  salida.innerHTML = '<div class="aviso neutro">Guardando…</div>';
+  try{
+    const d = await pedir({accion:'corregirParticipante', profesional:PROF,
+      codigo:GRUPO.codigo, fila:val('fpFila'), nombre:val('fpActual'),
+      nuevoNombre:nombre, documento:val('fpDoc'), edad:val('fpEdad'),
+      genero:val('fpGenero'), nacionalidad:val('fpNac'),
+      discapacidad:val('fpDisc'), vbg:val('fpVbg')});
+
+    if(!d.cambios.length){
+      salida.innerHTML = '<div class="aviso neutro">No había nada que cambiar.</div>';
+      return;
     }
+    salida.innerHTML = '<div class="aviso ok"><b>Guardado</b>'
+      + d.cambios.map(c=>esc(c)).join('<br>')
+      + (d.propagadas ? '<br><br>El nombre se actualizó también en las otras hojas.' : '')
+      + '</div>';
+    setTimeout(function(){
+      document.getElementById('gAviso').innerHTML='';
+      gRefrescar();
+    }, 1600);
+  }catch(e){
+    salida.innerHTML = '<div class="aviso error"><b>No se pudo</b>'+esc(e.message)+'</div>';
   }
 }
 
