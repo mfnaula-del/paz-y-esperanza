@@ -752,7 +752,11 @@ async function alternarRect(){
     rectGrab=false;
     clearInterval(rectCrono);
     try{ rectProc.disconnect(); rectFuente.disconnect(); rectPista.getTracks().forEach(t=>t.stop()); }catch(e){}
-    rectBlob=aWav(rectTrozos, rectHz);
+    let tot=0; rectTrozos.forEach(t=>tot+=t.length);
+    const m=new Int16Array(tot); let k=0;
+    rectTrozos.forEach(t=>{ m.set(t,k); k+=t.length; });
+    rectTrozos=[];
+    rectBlob=aWav16(m, HZ);
     document.getElementById('rectReloj').hidden=true;
     btn.textContent='Volver a dictar';
     document.getElementById('rectSalida').innerHTML=
@@ -767,7 +771,10 @@ async function alternarRect(){
     rectFuente=rectCtx.createMediaStreamSource(rectPista);
     rectProc=rectCtx.createScriptProcessor(4096,1,1);
     rectTrozos=[];
-    rectProc.onaudioprocess=e=>{ if(rectGrab) rectTrozos.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
+    rectProc.onaudioprocess=e=>{
+      if(!rectGrab) return;
+      rectTrozos.push(aEnteros(remuestrear(e.inputBuffer.getChannelData(0), rectHz, HZ)));
+    };
     rectFuente.connect(rectProc); rectProc.connect(rectCtx.destination);
     rectGrab=true; rectT0=Date.now();
     document.getElementById('rectReloj').hidden=false;
@@ -805,7 +812,22 @@ async function enviarRect(){
       cuerpo.append('audio',await aBase64(rectBlob));
       cuerpo.append('audioMime','audio/wav');
     }
-    const r=await fetch(URL_BACKEND,{method:'POST',body:cuerpo});
+    // Un audio grande puede tardar minutos en una conexión de campo. Sin
+    // límite, el botón se queda girando para siempre y no se sabe qué pasó.
+    const corte = new AbortController();
+    const reloj = setTimeout(()=>corte.abort(), 300000);   // 5 minutos
+    let r;
+    try{
+      r = await fetch(URL_BACKEND,{method:'POST',body:cuerpo,signal:corte.signal});
+    }catch(err){
+      clearTimeout(reloj);
+      if(err.name==='AbortError')
+        throw new Error('El envío tardó más de 5 minutos y se detuvo. '
+          + 'Suele pasar con audios largos o conexión lenta: prueba con la sesión '
+          + 'grabada en dos partes, o desde un lugar con mejor señal.');
+      throw err;
+    }
+    clearTimeout(reloj);
     const d=await r.json();
     cg.classList.remove('on');
     if(!d.exito) throw new Error(d.error||'error');
@@ -996,7 +1018,14 @@ async function empezar(){
   proc=ctx.createScriptProcessor(4096,1,1);
   const mudo=ctx.createGain(); mudo.gain.value=0;
   trozos=[];
-  proc.onaudioprocess=e=>{ if(grabando) trozos.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
+  // Se remuestrea EN EL MOMENTO, no al final. Guardar el audio en crudo a
+  // 48 kHz llenaba la memoria del celular —17 MB al minuto y medio— y el
+  // navegador mataba la pestaña: la grabación se cortaba sola y al enviar la
+  // página se recargaba como si nada hubiera pasado.
+  proc.onaudioprocess=e=>{
+    if(!grabando) return;
+    trozos.push(aEnteros(remuestrear(e.inputBuffer.getChannelData(0), hzOrigen, HZ)));
+  };
   fuente.connect(proc); proc.connect(mudo); mudo.connect(ctx.destination);
 
   grabando=true; t0=Date.now();
@@ -1030,15 +1059,31 @@ function detener(){
   document.getElementById('txtGrabar').textContent='Grabar sesión';
   document.getElementById('tiempo').classList.remove('activo');
 
+  // los trozos ya vienen remuestreados y en enteros: solo hay que unirlos
   let total=0; trozos.forEach(t=>total+=t.length);
-  const crudo=new Float32Array(total); let o=0;
-  trozos.forEach(t=>{crudo.set(t,o); o+=t.length;});
-  wavBlob=aWav(remuestrear(crudo,hzOrigen,HZ),HZ);
+  const muestras=new Int16Array(total); let o=0;
+  trozos.forEach(t=>{muestras.set(t,o); o+=t.length;});
+  trozos=[];                                  // liberar la memoria enseguida
+  wavBlob=aWav16(muestras,HZ);
 
   document.getElementById('reproductor').src=URL.createObjectURL(wavBlob);
   document.getElementById('cajaAudio').hidden=false;
-  decir('neutro','Audio listo',(wavBlob.size/1048576).toFixed(1)+' MB en formato WAV.');
+  const mb = wavBlob.size/1048576;
+  decir(mb > 9 ? 'neutro' : 'ok', 'Audio listo',
+    mb.toFixed(1) + ' MB · ' + Math.round(s) + ' segundos'
+    + (mb > 9 ? '<br><br>Es un audio largo y puede fallar al enviarlo desde el '
+              + 'celular. Si no sube, graba la sesión en dos partes.' : ''));
   revisarEnvio();
+}
+
+/** De Float32 a enteros de 16 bits: ocupa la mitad y es lo que pide el WAV. */
+function aEnteros(f){
+  const out=new Int16Array(f.length);
+  for(let i=0;i<f.length;i++){
+    const s=Math.max(-1,Math.min(1,f[i]));
+    out[i]=s<0 ? s*0x8000 : s*0x7FFF;
+  }
+  return out;
 }
 
 function remuestrear(entrada,de,a){
@@ -1049,6 +1094,18 @@ function remuestrear(entrada,de,a){
     salida[i]=entrada[i0]*(1-f)+entrada[i1]*f;
   }
   return salida;
+}
+
+/** El WAV a partir de muestras que ya son enteros de 16 bits. */
+function aWav16(m,hz){
+  const buf=new ArrayBuffer(44+m.length*2),v=new DataView(buf);
+  const txt=(p,s)=>{for(let i=0;i<s.length;i++)v.setUint8(p+i,s.charCodeAt(i));};
+  txt(0,'RIFF');v.setUint32(4,36+m.length*2,true);txt(8,'WAVE');
+  txt(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+  v.setUint32(24,hz,true);v.setUint32(28,hz*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);
+  txt(36,'data');v.setUint32(40,m.length*2,true);
+  for(let i=0;i<m.length;i++) v.setInt16(44+i*2,m[i],true);
+  return new Blob([v],{type:'audio/wav'});
 }
 
 function aWav(m,hz){
@@ -1191,7 +1248,22 @@ async function enviar(rehacer){
       cuerpo.append('adjuntoMime',a.mime);
     });
 
-    const r=await fetch(URL_BACKEND,{method:'POST',body:cuerpo});
+    // Un audio grande puede tardar minutos en una conexión de campo. Sin
+    // límite, el botón se queda girando para siempre y no se sabe qué pasó.
+    const corte = new AbortController();
+    const reloj = setTimeout(()=>corte.abort(), 300000);   // 5 minutos
+    let r;
+    try{
+      r = await fetch(URL_BACKEND,{method:'POST',body:cuerpo,signal:corte.signal});
+    }catch(err){
+      clearTimeout(reloj);
+      if(err.name==='AbortError')
+        throw new Error('El envío tardó más de 5 minutos y se detuvo. '
+          + 'Suele pasar con audios largos o conexión lenta: prueba con la sesión '
+          + 'grabada en dos partes, o desde un lugar con mejor señal.');
+      throw err;
+    }
+    clearTimeout(reloj);
     const d=await r.json();
     document.getElementById('cargando').classList.remove('on');
 
