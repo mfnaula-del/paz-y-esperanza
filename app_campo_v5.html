@@ -1069,8 +1069,9 @@ function detener(){
   document.getElementById('reproductor').src=URL.createObjectURL(wavBlob);
   document.getElementById('cajaAudio').hidden=false;
   const mb = wavBlob.size/1048576;
+  const seg = Math.round(muestras.length / HZ);   // la duración sale del audio
   decir(mb > 9 ? 'neutro' : 'ok', 'Audio listo',
-    mb.toFixed(1) + ' MB · ' + Math.round(s) + ' segundos'
+    mb.toFixed(1) + ' MB · ' + seg + ' segundos'
     + (mb > 9 ? '<br><br>Es un audio largo y puede fallar al enviarlo desde el '
               + 'celular. Si no sube, graba la sesión en dos partes.' : ''));
   revisarEnvio();
