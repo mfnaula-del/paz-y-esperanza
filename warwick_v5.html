@@ -1540,11 +1540,6 @@ async function elegirFicha(i){
   caja.innerHTML='<div class="cargando on">Abriendo…</div>';
   try{
     const d=await pedir({accion:'ficha',codigo:p.codigo,nombre:p.nombre});
-    // la firma de quien aplicó, si la tiene cargada
-    if(d.aplicador_clave){
-      try{ const f=await pedir({accion:'firma',clave:d.aplicador_clave});
-           d.__firma=f.firma; }catch(e){}
-    }
     let html='';
     if(d.pre)  html+=hojaOficial(d,'pre');
     if(d.post) html+=hojaOficial(d,'post');
@@ -1627,7 +1622,7 @@ function hojaOficial(d,momento){
   + '<p style="margin-top:12px"><b>Observaciones:</b></p>'
   + '<div class="obs">'+esc(r.observaciones||'')+'</div>'
 
-  + bloqueFirmas(d.aplicador, d.__firma)
+  + bloqueFirmas(d.aplicador)
   + '</div>';
 }
 
@@ -1635,14 +1630,15 @@ function hojaOficial(d,momento){
  * Dos espacios de firma. Si la profesional tiene su firma cargada, se dibuja
  * encima de la línea; si no, queda el espacio en blanco para firmar a mano.
  */
-function bloqueFirmas(aplicador, firma){
-  const img = firma && firma.datos
-    ? '<img src="data:image/png;base64,'+firma.datos+'" class="firma-img" alt="">'
-    : '';
+/**
+ * Quién aplicó la escala. Ya no lleva firma incrustada: el espacio queda en
+ * blanco para firmar a mano sobre el papel.
+ */
+function bloqueFirmas(aplicador){
   return '<div class="firmas">'
     + '<div class="firma-bloque"><div class="firma-linea"></div>'
     +   '<div class="firma-rot"><b>'+esc(aplicador||'')+'</b>Nombre del/la aplicador/a</div></div>'
-    + '<div class="firma-bloque"><div class="firma-linea">'+img+'</div>'
+    + '<div class="firma-bloque"><div class="firma-linea"></div>'
     +   '<div class="firma-rot"><b>&nbsp;</b>Firma</div></div>'
     + '</div>';
 }
@@ -1682,7 +1678,7 @@ function hojaComparativa(d){
   + '<div class="comparativa"><h3>INTERPRETACIÓN</h3>'
   +   '<p><span class="pill '+cl+'">'+esc(d.tendencia)+'</span></p>'
   +   '<p style="margin-top:8px">'+esc(d.frase)+'</p></div>'
-  + bloqueFirmas(d.aplicador, d.__firma)
+  + bloqueFirmas(d.aplicador)
   + '</div>';
 }
 
@@ -2310,8 +2306,6 @@ async function abrirGrupoCompleto(){
       return;
     }
 
-    // la firma se pide una sola vez, no una por persona
-    let firma = null;
     let html = '', conPre = 0, conPost = 0, sinNada = [];
 
     for(let i=0;i<gente.length;i++){
@@ -2319,12 +2313,6 @@ async function abrirGrupoCompleto(){
       try{
         const d = await pedir({accion:'ficha', codigo:GRUPO.codigo, nombre:gente[i].nombre});
         if(!d.pre && !d.post){ sinNada.push(gente[i].nombre); continue; }
-
-        if(firma === null && d.aplicador_clave){
-          try{ const f = await pedir({accion:'firma', clave:d.aplicador_clave});
-               firma = f.firma || false; }catch(e){ firma = false; }
-        }
-        if(firma) d.__firma = firma;
 
         if(d.pre){  html += hojaOficial(d,'pre');  conPre++; }
         if(d.post){ html += hojaOficial(d,'post'); conPost++; }
@@ -2683,7 +2671,7 @@ async function cargarReporte(){
       +   'quienes tienen ambas mediciones registradas. El umbral de cambio relevante es de '
       +   d.umbral+' puntos brutos.'
       + '</div>'
-      + bloqueFirmas(d.profesional||d.institucion, d.__firma)+'</div>'
+      + bloqueFirmas(d.profesional||d.institucion)+'</div>'
       + '<button class="btn btn-tinta no-imprimir" onclick="imprimirHojas(\'reporteSalida\')">Imprimir reporte</button>';
   }catch(e){
     caja.innerHTML='<div class="aviso error"><b>Error</b>'+esc(e.message)+'</div>';
