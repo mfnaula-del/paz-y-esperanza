@@ -1631,15 +1631,13 @@ function hojaOficial(d,momento){
  * encima de la línea; si no, queda el espacio en blanco para firmar a mano.
  */
 /**
- * Quién aplicó la escala. Ya no lleva firma incrustada: el espacio queda en
- * blanco para firmar a mano sobre el papel.
+ * Quién aplicó la escala. Sin espacio de firma: solo el nombre, porque la
+ * hoja se archiva junto al consentimiento y no hace falta firmarla aparte.
  */
 function bloqueFirmas(aplicador){
   return '<div class="firmas">'
     + '<div class="firma-bloque"><div class="firma-linea"></div>'
     +   '<div class="firma-rot"><b>'+esc(aplicador||'')+'</b>Nombre del/la aplicador/a</div></div>'
-    + '<div class="firma-bloque"><div class="firma-linea"></div>'
-    +   '<div class="firma-rot"><b>&nbsp;</b>Firma</div></div>'
     + '</div>';
 }
 
@@ -2243,7 +2241,7 @@ function estiloHoja(){
   + '.pill{display:inline-block;padding:1px 9px;border:1px solid #999;border-radius:20px;'
   +   'font-size:8.5pt;font-weight:700}'
   + '.firmas{margin-top:22px;display:flex;gap:30px;align-items:flex-end}'
-  + '.firma-bloque{flex:1}'
+  + '.firma-bloque{flex:0 0 58%}'
   + '.firma-linea{border-bottom:1px solid #000;height:34px;position:relative}'
   + '.firma-img{position:absolute;bottom:1px;left:6px;height:30px;width:auto}'
   + '.firma-rot{font-size:7.5pt;color:#444;margin-top:3px;line-height:1.3}'
