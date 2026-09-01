@@ -350,7 +350,7 @@ if (typeof html2pdf === 'undefined') {
     <h1>Escala Warwick</h1>
     <p class="sub">Busca a la persona por su nombre. Lo demás sale solo.</p>
     <p class="regla">Se aplica únicamente en <b>terapia individual</b> y desde los
-      <b>17 años</b>. En terapia grupal el código es del grupo entero, así que cada
+      <b>14 años</b>. En terapia grupal el código es del grupo entero, así que cada
       participante se identifica por su nombre: usa la pestaña <b>Grupal</b>.</p>
 
 <div class="loc" id="cajaLoc">
@@ -1436,7 +1436,7 @@ function pintarElegido(){
     +'" onclick="ponerMomento(\''+v+'\')">'+txt+'</button>';
   const alerta = p.aplica===null
     ? '<div class="meta" style="margin-top:8px;color:#FFD9A0">⚠ Edad no registrada en el audio. '
-      +'Confirma que tenga 17 años o más antes de aplicar.</div>' : '';
+      +'Confirma que tenga '+(EDAD_MINIMA||14)+' años o más antes de aplicar.</div>' : '';
   document.getElementById('elegido').innerHTML=
       '<div class="nom">'+esc(p.nombre)+'</div>'
     + '<div class="meta">'+(p.edad!==''?esc(p.edad)+' años · ':'')
@@ -1693,6 +1693,8 @@ function promedio(filas){
 //  GRUPAL
 // ============================================================================
 let GRUPO = null, GPART = [], GMOMENTO = 'pre', GINFO = null;
+// la edad mínima la define el backend: aquí solo se guarda lo que llegue
+let EDAD_MINIMA = 14;
 
 async function gCargarGrupos(){
   const caja=document.getElementById('gLista');
@@ -1743,6 +1745,7 @@ async function gRefrescar(){
   try{
     const d=await pedir({accion:'grilla',codigo:GRUPO.codigo,localidad:LOC});
     GINFO=d;
+    if(d.edad_minima) EDAD_MINIMA=d.edad_minima;
     if(d.cerrado && !GMOMENTO_TOCADO) GMOMENTO='post';
     gPintarCabecera();
     gPintarGrilla();
@@ -2300,7 +2303,8 @@ async function abrirGrupoCompleto(){
     if(!gente.length){
       cg.classList.remove('on');
       caja.innerHTML = '<div class="aviso neutro"><b>Nadie con Warwick aplicable</b>'
-        + 'En este grupo no hay participantes de 17 años o más con mediciones.</div>';
+        + 'En este grupo no hay participantes de '+(EDAD_MINIMA||14)
+        + ' años o más con mediciones.</div>';
       return;
     }
 

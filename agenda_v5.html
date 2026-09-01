@@ -99,6 +99,10 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 .acciones button.si{border-color:var(--oliva);background:var(--oliva);color:#fff}
 .acciones button.no{border-color:#E7C9C3;color:#7B241A}
 
+.donde-sera{background:var(--oliva);color:#fff;border-radius:10px;padding:13px 14px;
+  margin-top:9px;font-size:13.5px;line-height:1.5}
+.donde-sera b{display:block;font-size:15px;margin-bottom:4px}
+.donde-sera span{display:block;color:#C7D3C4;font-size:12.5px;margin-top:3px}
 .dispo{margin-top:11px;padding:12px 13px;border-radius:9px;font-size:13px;line-height:1.5;
   background:#EDF1EC;border-left:3px solid var(--oliva);color:#2C351F}
 .dispo.especial{background:#FDF3E3;border-left-color:var(--ambar);color:#5C4210}
@@ -441,14 +445,24 @@ function fijarProfesional(){
 // Queda fijo en un solo profesional: no se puede cambiar ni ver el de nadie más,
 // para que no haya equivocaciones en campo.
 const SOLO_AGENDA = new URLSearchParams(location.search).get('solo')==='1';
+// Quién agenda desde territorio. Solo ve y mueve lo que él mismo creó.
+const PUNTO = (new URLSearchParams(location.search).get('punto')||'').toUpperCase();
+const PUNTOS = {EAI:'EAI', JAR:'Jaramijó', PTV:'Portoviejo'};
 if(SOLO_AGENDA){
   document.querySelectorAll('a[href^="index.html"]').forEach(a=>a.remove());
+  // el punto focal sí necesita ver y mover lo que agendó
+  if(!PUNTOS[PUNTO]){
+    document.querySelectorAll('[role=tab]').forEach(b=>{
+      if(!/Nueva|Agendar/i.test(b.textContent)) b.remove();
+    });
+  }
   document.title='Agendar cita · '+PROFESIONALES[PROF].nombre;
   const caja=document.getElementById('cajaLoc');
   caja.classList.add('fijo');
   caja.innerHTML='<label>Agenda de</label>'
     +'<span class="fijo-nombre">'+PROFESIONALES[PROF].nombre+'</span>'
-    +'<span class="fijo-loc">'+PROFESIONALES[PROF].localidad+'</span>';
+    +'<span class="fijo-loc">'+PROFESIONALES[PROF].localidad
+    +  (PUNTOS[PUNTO] ? ' · agenda '+PUNTOS[PUNTO] : '')+'</span>';
 }else{
   fijarProfesional();
 }
@@ -683,7 +697,7 @@ async function guardar(forzar){
       cuando:val('fecha')+'T'+val('hora'),
       duracion:val('duracion'), modalidad:val('modalidad'),
       lugar:val('lugar'), motivo:val('motivo'),
-      atencion:val('atencion'), profesional:PROF,
+      atencion:val('atencion'), profesional:PROF, punto:PUNTO,
       forzar: forzar ? 'si' : ''
     });
     document.getElementById('cargando').classList.remove('on');
@@ -713,9 +727,15 @@ async function guardar(forzar){
       +(d.forzada?'<br>Quedó encima de otra cita, como pediste.':'')
       +' · '+esc(d.atencion||'Presencial')
       +(d.calendario?'<br>También está en tu Google Calendar.':'')
-      +(d.disponibilidad&&d.disponibilidad.especial
-        ?'<br>Ese día hay salida a comunidad: '+esc(d.disponibilidad.nota):'')
-      +'</div><div class="aviso neutro" style="margin-top:8px">'+esc(d.nota)+'</div>'
+      +'</div>'
+      // dónde recibirá la atención: lo primero que necesita saber la persona
+      +(d.donde
+        ?'<div class="donde-sera"><b>La atención será en '+esc(d.donde)+'</b>'
+          +'<span>Dile a la persona que se acerque ahí ese día.</span>'
+          +(d.disponibilidad&&d.disponibilidad.especial
+            ?'<span>'+esc(d.disponibilidad.nota)+'</span>':'')
+          +'</div>':'')
+      +'<div class="aviso neutro" style="margin-top:8px">'+esc(d.nota)+'</div>'
       +'<button class="btn btn-suave" onclick="limpiar()">Agendar a otra persona</button>';
   }catch(e){
     document.getElementById('cargando').classList.remove('on');
@@ -791,6 +811,7 @@ async function hDibujar(){
     const d=await pedir({accion:'agendaListar',filtro:'',dias:'90',profesional:PROF});
     cg.classList.remove('on');
 
+    window.CITAS = d.citas;
     // repartir las citas por día
     const porDia={};
     d.citas.forEach(c=>{
@@ -890,12 +911,15 @@ async function listar(){
   const caja=document.getElementById('listaSalida');
   caja.innerHTML='<div class="cargando on">Cargando…</div>';
   try{
-    const d=await pedir({accion:'agendaListar',filtro:val('filtro'),dias:'60',profesional:PROF});
+    const d=await pedir({accion:'agendaListar',filtro:val('filtro'),dias:'60',
+                         profesional:PROF, punto:PUNTO});
     if(!d.citas.length){
       caja.innerHTML='<div class="aviso neutro"><b>Sin citas</b>'
         +'No hay citas en los próximos 60 días con ese filtro.</div>';
       return;
     }
+    // Guardar la lista: sin esto, reagendar no encontraba la cita y no cargaba.
+    window.CITAS = d.citas;
     caja.innerHTML=
       '<div class="resumen">'
       + '<div class="tarjeta"><b>'+d.pendientes+'</b><span>Por atender</span></div>'
@@ -991,8 +1015,9 @@ async function reagGuardar(forzar){
   const salida = document.getElementById('reagSalida');
   salida.innerHTML = '<div class="aviso neutro">Moviendo…</div>';
   try{
-    const d = await pedir({accion:'agendaMover', profesional:PROF, fila:REAG.fila,
-      cuando:f+'T'+h, duracion:val('reagDur')||'60', forzar: forzar?'si':''});
+    const d = await pedir({accion:'agendaMover', profesional:PROF, punto:PUNTO,
+      fila:REAG.fila, cuando:f+'T'+h, duracion:val('reagDur')||'60',
+      forzar: forzar?'si':''});
 
     if(!d.creada){
       salida.innerHTML = '<div class="aviso neutro"><b>'+esc(d.mensaje)+'</b>'
@@ -1026,7 +1051,8 @@ function reagTomar(iso){
 
 async function marcar(fila,estado){
   try{
-    await pedir({accion:'agendaEstado',fila:fila,estado:estado,profesional:PROF});
+    await pedir({accion:'agendaEstado',fila:fila,estado:estado,
+                 profesional:PROF, punto:PUNTO});
     listar();
   }catch(e){
     document.getElementById('listaSalida').insertAdjacentHTML('afterbegin',
