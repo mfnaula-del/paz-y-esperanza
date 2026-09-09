@@ -180,6 +180,12 @@ table.of td.c{text-align:center;width:11%}
 .ff-nom{flex:1;font-size:13.5px}
 .ff-pts{font-family:var(--mono);font-size:11px;color:var(--apagado)}
 .fila-fecha input{width:auto;font-size:13.5px;padding:6px 8px;margin:0}
+.rejilla-fechas{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.rejilla-fechas .campo{margin:0}
+.atajos-fecha{display:flex;flex-wrap:wrap;gap:6px;margin:9px 0 4px}
+.atajos-fecha button{background:#EDF1EC;border:1px solid var(--linea);border-radius:20px;
+  padding:6px 13px;font-size:12px;font-family:inherit;color:#2C351F;cursor:pointer}
+.atajos-fecha button:hover{border-color:var(--oliva);background:#E3EAE1}
 .acciones-ficha{display:flex;gap:8px;margin-top:12px}
 .acciones-ficha .btn{margin-top:0;flex:1}
 .acciones-grupo{display:flex;flex-direction:column;gap:8px;margin-top:12px}
@@ -508,7 +514,31 @@ if (typeof html2pdf === 'undefined') {
     <section class="paso no-imprimir">
       <div class="paso-cabeza"><span class="paso-num">01</span><span class="paso-titulo">Filtrar</span></div>
       <div class="carta">
-        <input id="filtro" placeholder="Nombre, zona (MT) o mes (07/2026) — vacío = todos">
+        <input id="filtro" placeholder="Nombre o zona (MT) — vacío = todos">
+
+        <div class="rejilla-fechas">
+          <div class="campo">
+            <label for="repDesde">Desde</label>
+            <input id="repDesde" type="date">
+          </div>
+          <div class="campo">
+            <label for="repHasta">Hasta</label>
+            <input id="repHasta" type="date">
+          </div>
+        </div>
+        <p class="limite">Se mira la fecha del post-test, que es la que cierra el
+          proceso. Déjalas vacías para incluir todo.</p>
+
+        <div class="atajos-fecha">
+          <button onclick="rangoMes(0)">Este mes</button>
+          <button onclick="rangoMes(-1)">Mes pasado</button>
+          <button onclick="rangoTrimestre()">Trimestre</button>
+          <button onclick="rangoAnio()">Todo el año</button>
+          <button onclick="rangoLimpiar()">Sin filtro</button>
+        </div>
+
+        <label class="opcion"><input type="checkbox" id="soloCompletos" checked>
+          Solo procesos completos (con pre y post)</label>
         <label class="opcion"><input type="checkbox" id="anon"> Ocultar nombres al imprimir</label>
         <button class="btn btn-tinta" onclick="cargarReporte()">Generar reporte</button>
       </div>
@@ -2627,14 +2657,66 @@ async function corregirFechaTest(momento, valor){
 }
 
 // ---------------------------------------------------------- reporte
+
+
+/** Cómo se lee el periodo del reporte, para el encabezado impreso. */
+function periodoDelReporte(d){
+  const bonito = s => {
+    const m = String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m ? m[3]+'/'+m[2]+'/'+m[1] : '';
+  };
+  const a = bonito(d.desde), b = bonito(d.hasta);
+  let txt;
+  if(a && b)      txt = 'Periodo: del '+a+' al '+b;
+  else if(a)      txt = 'Periodo: desde el '+a;
+  else if(b)      txt = 'Periodo: hasta el '+b;
+  else            txt = 'Periodo: todos los registros';
+  return txt + (d.solo_completos ? ' · solo procesos completos' : '');
+}
+
+// ---------------------------------------------------------- atajos de fecha
+function ponerRango(desde, hasta){
+  const iso = f => f.toISOString().slice(0,10);
+  document.getElementById('repDesde').value = desde ? iso(desde) : '';
+  document.getElementById('repHasta').value = hasta ? iso(hasta) : '';
+}
+
+/** Un mes entero. 0 = este mes, -1 = el pasado. */
+function rangoMes(cuantos){
+  const h = new Date();
+  const ini = new Date(h.getFullYear(), h.getMonth()+cuantos, 1);
+  const fin = new Date(h.getFullYear(), h.getMonth()+cuantos+1, 0);
+  ponerRango(ini, fin > h ? h : fin);
+}
+
+/** Los últimos tres meses, que suele ser el corte de reporte. */
+function rangoTrimestre(){
+  const h = new Date();
+  ponerRango(new Date(h.getFullYear(), h.getMonth()-2, 1), h);
+}
+
+function rangoAnio(){
+  const h = new Date();
+  ponerRango(new Date(h.getFullYear(), 0, 1), h);
+}
+
+function rangoLimpiar(){ ponerRango(null, null); }
+
 async function cargarReporte(){
   const caja=document.getElementById('reporteSalida');
   const anon=document.getElementById('anon').checked;
   caja.innerHTML='<div class="cargando on">Calculando…</div>';
   try{
-    const d=await pedir({accion:'reporte',filtro:val('filtro'),localidad:LOC});
+    const d=await pedir({accion:'reporte',filtro:val('filtro'),localidad:LOC,
+                         desde:val('repDesde'), hasta:val('repHasta'),
+                         completos:document.getElementById('soloCompletos').checked?'si':''});
     if(!d.filas.length){
-      caja.innerHTML='<div class="aviso error"><b>Sin resultados</b>No hay tests que coincidan.</div>';
+      caja.innerHTML='<div class="aviso neutro"><b>Sin resultados</b>'
+        + (d.solo_completos
+           ? 'No hay procesos completos en ese rango. Prueba a desmarcar '
+             + '"Solo procesos completos" para ver los que van a medias.'
+           : 'No hay tests que coincidan con ese filtro.')
+        + '</div>';
       return;
     }
     const filas=d.filas.map(f=>{
@@ -2657,6 +2739,8 @@ async function cargarReporte(){
       + '<p class="sub2">'+esc(d.institucion)+' — Escala Warwick-Edinburgh (SWEMWBS) · '
       +   esc(d.localidad||'')+' · '+esc(d.profesional||'')
       +   ' · umbral de cambio significativo: '+d.umbral+' puntos brutos</p>'
+      // el periodo que cubre: lo primero que mira quien recibe el reporte
+      + '<p class="sub1">'+esc(periodoDelReporte(d))+'</p>'
       + '<div class="cifras" style="grid-template-columns:repeat(4,1fr)">'
       +  '<div class="cifra"><b>'+d.total+'</b><span>Participantes</span></div>'
       +  '<div class="cifra"><b>'+d.con_pre_y_post+'</b><span>Con pre y post</span></div>'
