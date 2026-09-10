@@ -912,19 +912,28 @@ async function cargarLugares(){
 }
 
 // ------------------------------------------------------------- código
+// El año va fijo, no del reloj del celular: si alguien lo tiene mal, el
+// código saldría con otro año y ese caso quedaría fuera del reporte.
+const ANIO_PROYECTO = '2026';
+
 function armarCodigo(){
   // si se está continuando un caso, el código ya lo tenemos
   if(ENTRADA==='seguir') return CASO ? CASO.codigo : null;
   const n=val('num');
   if(!LUGAR || !n) return null;
+
   const partes=[LOC];
   if(LOC==='MB'){
     const c=val('canton');
     if(!c) return null;
     partes.push(c);
   }
-  partes.push(LUGAR.sigla, modo, String(n).padStart(3,'0'));
-  return 'K-COL-2025-9005_R1A6_'+partes.join('-');
+  partes.push(LUGAR.sigla);
+
+  // Formato vigente: el tipo delante y el resto con guion bajo.
+  //   K-COL-2025-9005-R1A6-TI_MB_MT_TQ_026_2026
+  return 'K-COL-2025-9005-R1A6-'+modo+'_'+partes.join('_')
+       + '_'+String(n).padStart(3,'0')+'_'+ANIO_PROYECTO;
 }
 
 function pintarCodigo(){
