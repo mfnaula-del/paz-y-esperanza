@@ -142,6 +142,7 @@ audio{width:100%;margin-top:12px}
 .el-cambiar{background:none;border:0;color:#fff;opacity:.75;font-family:inherit;font-size:12px;
   text-decoration:underline;cursor:pointer;margin-top:10px;padding:0}
 
+.tras-envio{margin-top:16px;padding-top:14px;border-top:1px solid var(--linea)}
 .aviso-coherencia{background:#FDF3E3;border-left:3px solid var(--ambar);border-radius:9px;
   padding:12px 13px;margin-top:11px;font-size:13px;line-height:1.5;color:#5C4210}
 .aviso-coherencia b{display:block;margin-bottom:6px}
@@ -1230,6 +1231,12 @@ function revisarEnvio(){
 }
 
 async function enviar(rehacer){
+  // Un doble toque en pantalla táctil manda dos peticiones a la vez, y las dos
+  // llegan antes de que el servidor pueda bloquear la segunda.
+  if(ENVIANDO) return;
+  if(YA_ENVIADO && !rehacer) return;
+  ENVIANDO = true;
+
   const codigo=armarCodigo();
   if(!codigo || (!wavBlob && !ADJUNTOS.length)) return;
   document.getElementById('cargando').classList.add('on');
@@ -1284,13 +1291,20 @@ async function enviar(rehacer){
     }
     mostrar(d);
   }catch(e){
+    ENVIANDO = false;
     document.getElementById('cargando').classList.remove('on');
     // si esa sesión ya estaba guardada, ofrecer reemplazarla en vez de dejarlo
     // en un error sin salida
     if(/ya está registrada/.test(e.message)){
-      decir('neutro','Esa sesión ya está guardada', esc(e.message)
+      // Casi siempre significa que el envío anterior SÍ llegó y se perdió la
+      // respuesta. Decirlo así evita que la persona insista y duplique.
+      decir('ok','Esta sesión ya estaba guardada',
+         'Tu envío anterior sí llegó, aunque la pantalla no lo mostrara. '
+        +'No hace falta volver a enviarla.<br><br>'
+        +'<small>'+esc(e.message)+'</small>'
         +'<br><br><button class="btn btn-suave" style="margin-top:0" '
         +'onclick="enviar(true)">Reemplazarla con este dictado</button>');
+      cerrarEnvio();
     } else {
       decir('error','No se pudo enviar',esc(e.message)
         +' · Si dice "Failed to fetch", vuelve a implementar el Apps Script con acceso "Cualquier usuario".');
@@ -1306,6 +1320,46 @@ function aBase64(blob){
     fr.onerror=mal; fr.readAsDataURL(blob);
   });
 }
+
+/**
+ * Deja la pantalla en estado "ya se guardó".
+ *
+ * El problema real no era estético: cuando la confirmación no se veía, la
+ * persona volvía a enviar y se duplicaba la información. Aquí se limpia el
+ * formulario, se bloquea el botón y se lleva la vista a la confirmación, para
+ * que no quede duda de que el envío llegó.
+ */
+function cerrarEnvio(){
+  YA_ENVIADO = true;
+  ENVIANDO = false;
+  wavBlob = null; ADJUNTOS = [];
+  ['obs','sesion','sesionSeguir','num'].forEach(function(id){
+    const e = document.getElementById(id); if(e) e.value = '';
+  });
+  ['cajaAudio','listaAdjuntos'].forEach(function(id){
+    const e = document.getElementById(id); if(e) e.hidden = true;
+  });
+  const b = document.getElementById('btnEnviar');
+  if(b){ b.disabled = true; b.textContent = 'Ya enviado'; }
+  document.getElementById('salida').scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+/** Deja todo listo para registrar otra sesión. */
+function otraSesion(){
+  YA_ENVIADO = false;
+  ENVIANDO = false;
+  CASO = null;
+  document.getElementById('salida').innerHTML = '';
+  const s = document.getElementById('secElegido');
+  if(s) s.hidden = true;
+  const b = document.getElementById('btnEnviar');
+  if(b) b.disabled = false;
+  if(typeof buscarCasos === 'function') buscarCasos();
+  revisarEnvio();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+let YA_ENVIADO = false, ENVIANDO = false;
 
 function mostrar(d){
   // crudo=true para valores que ya llevan HTML propio (el código va en monoespaciada)
@@ -1341,7 +1395,13 @@ function mostrar(d){
     + 'Abrir documento</a></p></div>' + nota
     + incoh
     + recordar
-    + revisar;
+    + revisar
+    + '<div class="tras-envio">'
+    +   '<button class="btn btn-enviar" onclick="otraSesion()">Registrar otra sesión</button>'
+    +   '<a class="btn btn-suave" href="index.html" style="display:block;'
+    +     'text-align:center;text-decoration:none;line-height:1.4">Volver al inicio</a>'
+    + '</div>';
+  cerrarEnvio();
 }
 
 async function probarConexion(){
