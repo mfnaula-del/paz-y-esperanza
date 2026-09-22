@@ -242,11 +242,72 @@ document.querySelectorAll('.tarjeta').forEach(a=>{
   a.href=a.getAttribute('href')+'?prof='+PROF;
 });
 
+// Acciones que solo leen datos. Se reintentan solas si Google tropieza,
+// porque repetirlas no cambia nada. Las que guardan NO se reintentan: si la
+// primera sí llegó, repetirla podría duplicar la información.
+const SOLO_LECTURA = ['buscar','ficha','grilla','grupos','reporte','items','escala',
+  'margen','hojasBlanco','sinDueno','casosAbiertos','estadoCaso','fechasCaso',
+  'verParticipante','lugarListar','lugarSiguienteNumero','agendaListar',
+  'agendaDia','agendaHuecos','firma'];
+
+const dormirMs = ms => new Promise(r => setTimeout(r, ms));
+
+/**
+ * Habla con el servidor.
+ *
+ * Apps Script a veces devuelve una página de error en vez de datos: un
+ * tropiezo pasajero de Google, más frecuente tras un rato sin uso. Antes eso
+ * llegaba a la pantalla como "Unexpected token '<'". Ahora se detecta, y si la
+ * acción solo lee, se reintenta sola con una pequeña espera.
+ */
+
+/**
+ * Lee la respuesta reconociendo la página de error de Google.
+ * Para los envíos grandes, que no pasan por pedir(). No reintenta.
+ */
+async function leerRespuesta(r){
+  const txt = await r.text();
+  if(txt.trim().charAt(0) === '<')
+    throw new Error('El servidor de Google tuvo un tropiezo y no se sabe si guardó. '
+      + 'Revisa si la información ya aparece antes de volver a enviarla.');
+  return JSON.parse(txt);
+}
+
 async function pedir(datos){
-  const r=await fetch(URL_BACKEND,{method:'POST',body:new URLSearchParams(datos)});
-  const d=await r.json();
-  if(!d.exito) throw new Error(d.error||'error');
-  return d;
+  
+  const lectura = SOLO_LECTURA.indexOf(datos.accion) !== -1;
+  const intentos = lectura ? 3 : 1;
+  let ultimo = null;
+
+  for(let i=0; i<intentos; i++){
+    if(i > 0) await dormirMs(1200 * i);     // 1.2 s, luego 2.4 s
+    try{
+      const r = await fetch(URL_BACKEND,{method:'POST',body:new URLSearchParams(datos)});
+      const txt = await r.text();
+
+      // ¿vino una página de error en vez de datos?
+      if(txt.trim().charAt(0) === '<'){
+        ultimo = new Error('TROPIEZO');
+        continue;
+      }
+      const d = JSON.parse(txt);
+      if(!d.exito) throw new Error(d.error||'error sin detalle');
+      return d;
+    }catch(e){
+      // un error de la aplicación (datos inválidos, etc.) no se reintenta
+      if(e.message !== 'TROPIEZO' && !/Failed to fetch|NetworkError/i.test(e.message))
+        throw e;
+      ultimo = e;
+    }
+  }
+
+  // se agotaron los intentos
+  if(lectura)
+    throw new Error('El servidor de Google no respondió bien, ni reintentando. '
+      + 'Espera unos segundos y vuelve a intentarlo.');
+  throw new Error('El servidor de Google tuvo un tropiezo y no se sabe si guardó. '
+    + 'Antes de volver a enviar, revisa si la información ya aparece: '
+    + 'así evitas duplicarla.');
 }
 
 // --- estado del servidor ---
@@ -259,7 +320,7 @@ async function comprobar(){
   }
   try{
     const r=await fetch(URL_BACKEND+'?ping=1');
-    const d=await r.json();
+    const d=await leerRespuesta(r);
     el.innerHTML='<span class="punto ok"></span>Servidor conectado · '+esc(d.version||'');
     return true;
   }catch(e){
