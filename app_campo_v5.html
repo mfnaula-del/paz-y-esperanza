@@ -347,6 +347,7 @@ body.grabando .subir{background:#1B2027;border-color:#39414B;color:#9AA6B2}
 // ===========================================================================
 const URL_BACKEND = 'https://script.google.com/macros/s/AKfycbznImdt0wZkkJHl_xu5bWxjdhZAOS3Gyqbw1L086yO4MkGIDizfUBq4SfhdeJm0X1Lh/exec';
 
+
 // ---------------------------------------------------------- profesional
 // Quién está usando el sistema. Viaja en el enlace (?prof=PV) para que cada
 // una guarde su acceso ya fijado. De aquí sale su localidad, su agenda y la
@@ -771,9 +772,10 @@ async function alternarRect(){
     rectFuente=rectCtx.createMediaStreamSource(rectPista);
     rectProc=rectCtx.createScriptProcessor(4096,1,1);
     rectTrozos=[];
+    const rectRem = nuevoRemuestreador(rectHz, HZ);
     rectProc.onaudioprocess=e=>{
       if(!rectGrab) return;
-      rectTrozos.push(aEnteros(remuestrear(e.inputBuffer.getChannelData(0), rectHz, HZ)));
+      rectTrozos.push(aEnteros(rectRem(e.inputBuffer.getChannelData(0))));
     };
     rectFuente.connect(rectProc); rectProc.connect(rectCtx.destination);
     rectGrab=true; rectT0=Date.now();
@@ -815,16 +817,20 @@ async function enviarRect(){
     // Un audio grande puede tardar minutos en una conexión de campo. Sin
     // límite, el botón se queda girando para siempre y no se sabe qué pasó.
     const corte = new AbortController();
-    const reloj = setTimeout(()=>corte.abort(), 300000);   // 5 minutos
+    // El servidor se rinde solo a los 4.5 minutos y devuelve un mensaje útil.
+    // Este corte es la red de seguridad por si ni eso llega: va después, no antes.
+    const reloj = setTimeout(()=>corte.abort(), 420000);   // 7 minutos
     let r;
     try{
       r = await fetch(URL_BACKEND,{method:'POST',body:cuerpo,signal:corte.signal});
     }catch(err){
       clearTimeout(reloj);
       if(err.name==='AbortError')
-        throw new Error('El envío tardó más de 5 minutos y se detuvo. '
-          + 'Suele pasar con audios largos o conexión lenta: prueba con la sesión '
-          + 'grabada en dos partes, o desde un lugar con mejor señal.');
+        throw new Error('El envío se detuvo sin respuesta del servidor. '
+          + 'Antes de repetirlo, busca a la persona en "Continuar": si la sesión '
+          + 'ya aparece, se guardó y no hace falta enviarla otra vez. '
+          + 'Si no aparece, el audio sigue grabado: vuelve a enviarlo en un par '
+          + 'de minutos o desde un lugar con mejor señal.');
       throw err;
     }
     clearTimeout(reloj);
@@ -1093,9 +1099,10 @@ async function empezar(){
   // 48 kHz llenaba la memoria del celular —17 MB al minuto y medio— y el
   // navegador mataba la pestaña: la grabación se cortaba sola y al enviar la
   // página se recargaba como si nada hubiera pasado.
+  const remuestreador = nuevoRemuestreador(hzOrigen, HZ);
   proc.onaudioprocess=e=>{
     if(!grabando) return;
-    trozos.push(aEnteros(remuestrear(e.inputBuffer.getChannelData(0), hzOrigen, HZ)));
+    trozos.push(aEnteros(remuestreador(e.inputBuffer.getChannelData(0))));
   };
   fuente.connect(proc); proc.connect(mudo); mudo.connect(ctx.destination);
 
@@ -1156,6 +1163,37 @@ function aEnteros(f){
     out[i]=s<0 ? s*0x8000 : s*0x7FFF;
   }
   return out;
+}
+
+/**
+ * Remuestrea manteniendo la continuidad entre bloques.
+ *
+ * El navegador entrega el audio en bloques de 4096 muestras. Remuestrear cada
+ * uno por separado dejaba un corte en cada frontera —unos doce por segundo—
+ * y el audio se volvía inservible. Aquí se recuerda en qué punto se quedó el
+ * bloque anterior y su última muestra, para que el empalme sea limpio.
+ */
+function nuevoRemuestreador(de, a){
+  const razon = de / a;
+  let posicion = 0;       // dónde íbamos dentro del bloque actual
+  let anterior = 0;       // última muestra del bloque previo
+
+  return function(bloque){
+    if(de === a){ return Float32Array.from(bloque); }
+    const salida = [];
+    let x = posicion;
+    while(x < bloque.length){
+      const i0 = Math.floor(x);
+      const f = x - i0;
+      const m0 = (i0 < 0) ? anterior : bloque[i0];
+      const m1 = (i0 + 1 < bloque.length) ? bloque[i0 + 1] : bloque[bloque.length - 1];
+      salida.push(m0 * (1 - f) + m1 * f);
+      x += razon;
+    }
+    posicion = x - bloque.length;   // el sobrante se lleva al siguiente bloque
+    anterior = bloque[bloque.length - 1];
+    return Float32Array.from(salida);
+  };
 }
 
 function remuestrear(entrada,de,a){
@@ -1329,16 +1367,20 @@ async function enviar(rehacer){
     // Un audio grande puede tardar minutos en una conexión de campo. Sin
     // límite, el botón se queda girando para siempre y no se sabe qué pasó.
     const corte = new AbortController();
-    const reloj = setTimeout(()=>corte.abort(), 300000);   // 5 minutos
+    // El servidor se rinde solo a los 4.5 minutos y devuelve un mensaje útil.
+    // Este corte es la red de seguridad por si ni eso llega: va después, no antes.
+    const reloj = setTimeout(()=>corte.abort(), 420000);   // 7 minutos
     let r;
     try{
       r = await fetch(URL_BACKEND,{method:'POST',body:cuerpo,signal:corte.signal});
     }catch(err){
       clearTimeout(reloj);
       if(err.name==='AbortError')
-        throw new Error('El envío tardó más de 5 minutos y se detuvo. '
-          + 'Suele pasar con audios largos o conexión lenta: prueba con la sesión '
-          + 'grabada en dos partes, o desde un lugar con mejor señal.');
+        throw new Error('El envío se detuvo sin respuesta del servidor. '
+          + 'Antes de repetirlo, busca a la persona en "Continuar": si la sesión '
+          + 'ya aparece, se guardó y no hace falta enviarla otra vez. '
+          + 'Si no aparece, el audio sigue grabado: vuelve a enviarlo en un par '
+          + 'de minutos o desde un lugar con mejor señal.');
       throw err;
     }
     clearTimeout(reloj);
