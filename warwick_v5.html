@@ -514,27 +514,35 @@ if (typeof html2pdf === 'undefined') {
     <section class="paso no-imprimir">
       <div class="paso-cabeza"><span class="paso-num">01</span><span class="paso-titulo">Filtrar</span></div>
       <div class="carta">
-        <input id="filtro" placeholder="Nombre o zona (MT) — vacío = todos">
-
-        <div class="rejilla-fechas">
-          <div class="campo">
-            <label for="repDesde">Desde</label>
-            <input id="repDesde" type="date">
-          </div>
-          <div class="campo">
-            <label for="repHasta">Hasta</label>
-            <input id="repHasta" type="date">
-          </div>
+        <div class="loc" id="cajaRepLoc">
+          <label for="repLoc">Localidad</label>
+          <select id="repLoc">
+            <option value="MB">Manabí</option>
+            <option value="G">Guayaquil</option>
+            <option value="M">Milagro</option>
+          </select>
         </div>
-        <p class="limite">Se mira el mes y el año del post-test, que es el que cierra el
-          proceso (el día no importa). Déjalas vacías para incluir todo.</p>
+
+        <input id="filtro" placeholder="Nombre o zona (MT) — vacío = todos" style="margin-top:12px">
+
+        <div class="loc">
+          <label for="repMesDesde">Desde</label>
+          <select id="repMesDesde" onchange="vistaPreviaPeriodo()"></select>
+          <select id="repAnioDesde" onchange="vistaPreviaPeriodo()"></select>
+        </div>
+        <div class="loc" style="margin-top:8px">
+          <label for="repMesHasta">Hasta</label>
+          <select id="repMesHasta" onchange="vistaPreviaPeriodo()"></select>
+          <select id="repAnioHasta" onchange="vistaPreviaPeriodo()"></select>
+        </div>
+        <p class="limite" id="repPrevio">Elige el mes de corte. Los cortes son el 25 de cada mes.</p>
 
         <div class="atajos-fecha">
-          <button onclick="rangoMes(0)">Este mes</button>
-          <button onclick="rangoMes(-1)">Mes pasado</button>
-          <button onclick="rangoTrimestre()">Trimestre</button>
-          <button onclick="rangoAnio()">Todo el año</button>
-          <button onclick="rangoLimpiar()">Sin filtro</button>
+          <button onclick="periodoRapido('actual')">Este periodo</button>
+          <button onclick="periodoRapido('pasado')">Periodo pasado</button>
+          <button onclick="periodoRapido('trimestre')">Trimestre</button>
+          <button onclick="periodoRapido('anio')">Todo el año</button>
+          <button onclick="periodoRapido('todo')">Sin filtro</button>
         </div>
 
         <label class="opcion"><input type="checkbox" id="soloCompletos" checked>
@@ -1212,7 +1220,7 @@ function verVista(v,btn){
 // Acciones que solo leen datos. Se reintentan solas si Google tropieza,
 // porque repetirlas no cambia nada. Las que guardan NO se reintentan: si la
 // primera sí llegó, repetirla podría duplicar la información.
-const SOLO_LECTURA = ['buscar','ficha','grilla','grupos','reporte','items','escala',
+const SOLO_LECTURA = ['buscar','ficha','grilla','grupos','reporte','periodo','items','escala',
   'margen','hojasBlanco','sinDueno','casosAbiertos','estadoCaso','fechasCaso',
   'verParticipante','lugarListar','lugarSiguienteNumero','agendaListar',
   'agendaDia','agendaHuecos','firma'];
@@ -2721,59 +2729,109 @@ async function corregirFechaTest(momento, valor){
 
 /** Cómo se lee el periodo del reporte, para el encabezado impreso. */
 function periodoDelReporte(d){
-  const bonito = s => {
-    const m = String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    return m ? m[3]+'/'+m[2]+'/'+m[1] : '';
-  };
-  const a = bonito(d.desde), b = bonito(d.hasta);
   let txt;
-  if(a && b)      txt = 'Periodo: del '+a+' al '+b;
-  else if(a)      txt = 'Periodo: desde el '+a;
-  else if(b)      txt = 'Periodo: hasta el '+b;
-  else            txt = 'Periodo: todos los registros';
+  if(d.periodo && d.periodo.texto){
+    txt = 'Periodo: ' + d.periodo.texto + ' · ' + d.periodo.rango
+        + ' (corte el 25 de cada mes)';
+  } else {
+    const bonito = s => {
+      const m = String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      return m ? m[3]+'/'+m[2]+'/'+m[1] : '';
+    };
+    const a = bonito(d.desde), b = bonito(d.hasta);
+    if(a && b)      txt = 'Periodo: del '+a+' al '+b;
+    else if(a)      txt = 'Periodo: desde el '+a;
+    else if(b)      txt = 'Periodo: hasta el '+b;
+    else            txt = 'Periodo: todos los registros';
+  }
   return txt + (d.solo_completos ? ' · solo procesos completos' : '');
 }
 
-// ---------------------------------------------------------- atajos de fecha
-function ponerRango(desde, hasta){
-  const iso = f => f.toISOString().slice(0,10);
-  document.getElementById('repDesde').value = desde ? iso(desde) : '';
-  document.getElementById('repHasta').value = hasta ? iso(hasta) : '';
+// ---------------------------------------------------------- periodo de corte
+// El reporte se cierra el 25 de cada mes (o el día laborable más cercano). «Septiembre»
+// es del corte de agosto al corte de septiembre. Las fechas exactas las calcula el
+// servidor, que conoce los feriados; aquí solo se elige el mes.
+const MESES_REP = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto',
+                   'Septiembre','Octubre','Noviembre','Diciembre'];
+
+function llenarPeriodos(){
+  const y = new Date().getFullYear();
+  ['Desde','Hasta'].forEach(k=>{
+    document.getElementById('repMes'+k).innerHTML = '<option value="">Mes</option>'
+      + MESES_REP.map((n,i)=>'<option value="'+String(i+1).padStart(2,'0')+'">'+n+'</option>').join('');
+    document.getElementById('repAnio'+k).innerHTML = '<option value="">Año</option>'
+      + [y-1,y,y+1].map(v=>'<option value="'+v+'">'+v+'</option>').join('');
+  });
 }
 
-/** Un mes entero. 0 = este mes, -1 = el pasado. */
-function rangoMes(cuantos){
+/** El mes de corte en que estamos: pasado el 25, ya corre el del mes siguiente. */
+function mesDeCorteActual(){
   const h = new Date();
-  const ini = new Date(h.getFullYear(), h.getMonth()+cuantos, 1);
-  const fin = new Date(h.getFullYear(), h.getMonth()+cuantos+1, 0);
-  ponerRango(ini, fin > h ? h : fin);
+  return desplazarMes(h.getFullYear(), h.getMonth()+1 + (h.getDate() > 25 ? 1 : 0), 0);
+}
+/** Suma meses a (año, mes 1-12) y devuelve 'aaaa-mm'. */
+function desplazarMes(anio, mes, cuantos){
+  const t = anio*12 + (mes-1) + cuantos;
+  return Math.floor(t/12) + '-' + String(t%12 + 1).padStart(2,'0');
+}
+function ponerPeriodo(desde, hasta){
+  const poner = (k, ym) => {
+    document.getElementById('repMes'+k).value  = ym ? ym.slice(5,7) : '';
+    document.getElementById('repAnio'+k).value = ym ? ym.slice(0,4) : '';
+  };
+  poner('Desde', desde); poner('Hasta', hasta);
+}
+/** {mes_desde, mes_hasta} como 'aaaa-mm'; vacíos si no hay filtro. Con solo uno, el otro es igual. */
+function leerPeriodo(){
+  const g = k => {
+    const m = document.getElementById('repMes'+k).value, a = document.getElementById('repAnio'+k).value;
+    return (m && a) ? a+'-'+m : '';
+  };
+  const d = g('Desde'), h = g('Hasta');
+  return { mes_desde: d || h, mes_hasta: h || d };
+}
+function periodoRapido(tipo){
+  const [y,m] = mesDeCorteActual().split('-').map(Number);
+  if(tipo==='actual')         ponerPeriodo(mesDeCorteActual(), mesDeCorteActual());
+  else if(tipo==='pasado')    ponerPeriodo(desplazarMes(y,m,-1), desplazarMes(y,m,-1));
+  else if(tipo==='trimestre') ponerPeriodo(desplazarMes(y,m,-2), mesDeCorteActual());
+  else if(tipo==='anio')      ponerPeriodo(y+'-01', mesDeCorteActual());
+  else                        ponerPeriodo('', '');
+  vistaPreviaPeriodo();
 }
 
-/** Los últimos tres meses, que suele ser el corte de reporte. */
-function rangoTrimestre(){
-  const h = new Date();
-  ponerRango(new Date(h.getFullYear(), h.getMonth()-2, 1), h);
+/** Muestra, antes de generar, qué fechas cubre lo elegido (y avisa si el corte se movió). */
+async function vistaPreviaPeriodo(){
+  const caja = document.getElementById('repPrevio');
+  const p = leerPeriodo();
+  if(!p.mes_desde){ caja.textContent = 'Sin filtro de fechas: se incluyen todos los registros.'; return; }
+  try{
+    const d = await pedir({accion:'periodo', mes_desde:p.mes_desde, mes_hasta:p.mes_hasta});
+    caja.textContent = d.texto + ': ' + d.rango + '.' + (d.avisos.length ? '  ⚠ ' + d.avisos.join(' ') : '');
+  }catch(e){ caja.textContent = 'No se pudo calcular el periodo: ' + e.message; }
 }
 
-function rangoAnio(){
-  const h = new Date();
-  ponerRango(new Date(h.getFullYear(), 0, 1), h);
+/** La localidad del reporte: solo el responsable (enlace admin) puede cambiarla. */
+function fijarLocalidadReporte(){
+  const sel = document.getElementById('repLoc');
+  sel.value = LOC;
+  if(!ADMIN) sel.disabled = true;
 }
-
-function rangoLimpiar(){ ponerRango(null, null); }
 
 async function cargarReporte(){
   const caja=document.getElementById('reporteSalida');
   const anon=document.getElementById('anon').checked;
   caja.innerHTML='<div class="cargando on">Calculando…</div>';
   try{
-    const d=await pedir({accion:'reporte',filtro:val('filtro'),localidad:LOC,
-                         desde:val('repDesde'), hasta:val('repHasta'),
+    const per=leerPeriodo();
+    const d=await pedir({accion:'reporte',filtro:val('filtro'),
+                         localidad:val('repLoc')||LOC,
+                         mes_desde:per.mes_desde, mes_hasta:per.mes_hasta,
                          completos:document.getElementById('soloCompletos').checked?'si':''});
     if(!d.filas.length){
       caja.innerHTML='<div class="aviso neutro"><b>Sin resultados</b>'
         + (d.solo_completos
-           ? 'No hay procesos completos en ese rango. Prueba a desmarcar '
+           ? 'No hay procesos completos en ese periodo. Prueba a desmarcar '
              + '"Solo procesos completos" para ver los que van a medias.'
            : 'No hay tests que coincidan con ese filtro.')
         + '</div>';
@@ -2825,6 +2883,10 @@ async function cargarReporte(){
 }
 
 fijarProfesional();
+llenarPeriodos();
+fijarLocalidadReporte();
+ponerPeriodo(mesDeCorteActual(), mesDeCorteActual());
+vistaPreviaPeriodo();
 (function(){ const f=document.getElementById('fechaApl');
   if(f) f.value=new Date().toISOString().slice(0,10); })();
 cargarInfo();
